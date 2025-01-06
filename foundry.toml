@@ -4,3 +4,31 @@ out = "out"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+[rpc_endpoints]
+mainnet = "${RPC_MAINNET}"
+polygon = "${RPC_POLYGON}"
+polygon_amoy = "${RPC_POLYGON_AMOY}"
+avalanche = "${RPC_AVALANCHE}"
+avalanche_fuji = "${RPC_AVALANCHE_FUJI}"
+arbitrum = "${RPC_ARBITRUM}"
+arbitrum_sepolia = "${RPC_ARBITRUM_SEPOLIA}"
+fantom = "${RPC_FANTOM}"
+fantom_testnet = "${RPC_FANTOM_TESTNET}"
+optimism = "${RPC_OPTIMISM}"
+optimism_sepolia = "${RPC_OPTIMISM_SEPOLIA}"
+harmony = "${RPC_HARMONY}"
+sepolia = "${RPC_SEPOLIA}"
+scroll = "${RPC_SCROLL}"
+scroll_sepolia = "${RPC_SCROLL_SEPOLIA}"
+metis = "${RPC_METIS}"
+base = "${RPC_BASE}"
+base_sepolia = "${RPC_BASE_SEPOLIA}"
+bnb = "${RPC_BNB}"
+gnosis = "${RPC_GNOSIS}"
+zkEVM = "${RPC_ZKEVM}"
+celo = "${RPC_CELO}"
+zksync = "${RPC_ZKSYNC}"
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+[fmt]
+tab_width = 2
