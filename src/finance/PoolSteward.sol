@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
-import {ICollector, CollectorUtils as CU} from "../CollectorUtils.sol";
+import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
 import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
 import {IPool, DataTypes as DataTypesV3} from "aave-address-book/AaveV3.sol";
@@ -15,7 +15,7 @@ import {IPoolSteward} from "./interfaces/IPoolSteward.sol";
  * @title PoolSteward
  * @author luigy-lemon  (Karpatkey)
  * @author efecarranza  (Tokenlogic)
- * @notice Helper contract that enables a Guardian to execute permissioned actions on the Aave Collector
+ * @notice Manages deposits, withdrawals, and asset migrations between Aave V2 and Aave V3 pools
  */
 contract PoolSteward is OwnableWithGuardian, IPoolSteward {
     using DataTypesV2 for DataTypesV2.ReserveData;
@@ -23,10 +23,10 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
     using CU for ICollector;
     using CU for CU.IOInput;
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     ICollector public immutable COLLECTOR;
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     mapping(address poolV3 => bool) public poolsV3;
     mapping(address poolV2 => bool) public poolsV2;
 
@@ -53,7 +53,7 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
 
     /// Steward Actions
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     function depositV3(
         address pool,
         address reserve,
@@ -66,7 +66,7 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
         CU.depositToV3(COLLECTOR, depositData);
     }
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     function withdrawV3(
         address pool,
         address reserve,
@@ -79,7 +79,7 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
         CU.withdrawFromV3(COLLECTOR, withdrawData, address(COLLECTOR));
     }
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     function withdrawV2(
         address pool,
         address reserve,
@@ -87,11 +87,13 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
     ) external onlyOwnerOrGuardian {
         if (amount == 0) revert InvalidZeroAmount();
 
+        _validateV2Pool(pool);
+
         CU.IOInput memory withdrawData = CU.IOInput(pool, reserve, amount);
         CU.withdrawFromV2(COLLECTOR, withdrawData, address(COLLECTOR));
     }
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     function migrateBetweenV3(
         address fromPool,
         address toPool,
@@ -117,7 +119,7 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
         CU.depositToV3(COLLECTOR, depositData);
     }
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     function migrateV2toV3(
         address v2Pool,
         address v3Pool,
@@ -126,6 +128,7 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
     ) external onlyOwnerOrGuardian {
         if (amount == 0) revert InvalidZeroAmount();
 
+        _validateV2Pool(v2Pool);
         _validateV3Pool(v3Pool);
 
         CU.IOInput memory withdrawData = CU.IOInput(v2Pool, reserve, amount);
@@ -145,12 +148,12 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
 
     /// DAO Actions
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     function approvePool(address newPool, bool isVersion3) external onlyOwner {
         _approvePool(newPool, isVersion3);
     }
 
-    /// @inheritdoc IPoolV3FinSteward
+    /// @inheritdoc IPoolSteward
     function revokePool(address pool, bool isVersion3) external onlyOwner {
         _revokePool(pool, isVersion3);
     }
@@ -166,7 +169,7 @@ contract PoolSteward is OwnableWithGuardian, IPoolSteward {
         } else {
             poolsV2[pool] = true;
         }
-        emit ApprovedPool(pool);
+        emit ApprovedPool(pool, isVersion3 ? bytes("v3") : bytes("v2"));
     }
 
     /// @dev Internal function to approve an Aave V3 Pool instance

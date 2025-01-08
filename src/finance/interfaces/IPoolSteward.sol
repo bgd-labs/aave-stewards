@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ICollector} from "../../CollectorUtils.sol";
+import {ICollector} from "aave-helpers/src/CollectorUtils.sol";
 import {IPool} from "aave-address-book/AaveV3.sol";
 import {ILendingPool} from "aave-address-book/AaveV2.sol";
 
@@ -20,7 +20,8 @@ interface IPoolSteward {
 
     /// @notice Emitted when a new Pool gets listed
     /// @param pool The address of the new pool
-    event ApprovedPool(address indexed pool);
+    /// @param version The pool version (ie: v2/v3)
+    event ApprovedPool(address indexed pool, bytes version);
 
     /// @notice Emitted when a Pool gets removed
     /// @param pool The address of the revoked pool
