@@ -2,8 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {ICollector} from "aave-helpers/src/CollectorUtils.sol";
-import {IPool} from "aave-address-book/AaveV3.sol";
-import {ILendingPool} from "aave-address-book/AaveV2.sol";
 
 interface IPoolSteward {
     /// @dev Provided address cannot be the zero-address

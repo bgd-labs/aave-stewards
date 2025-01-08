@@ -9,12 +9,8 @@ import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethe
 import {AaveV3EthereumEtherFi, AaveV3EthereumEtherFiAssets} from "aave-address-book/AaveV3EthereumEtherFi.sol";
 import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
 import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
-import {AggregatorInterface} from "aave-v3-origin/contracts/dependencies/chainlink/AggregatorInterface.sol";
 import {CollectorUtils} from "aave-helpers/src/CollectorUtils.sol";
-import {ProxyAdmin} from "solidity-utils/contracts/transparent-proxy/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "solidity-utils/contracts/transparent-proxy/TransparentUpgradeableProxy.sol";
 import {ICollector} from "aave-address-book/common/ICollector.sol";
-import {IAccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 import {PoolSteward, IPoolSteward} from "src/finance/PoolSteward.sol";
 

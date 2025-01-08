@@ -2,13 +2,10 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
-import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
 import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
-import {IPool, DataTypes as DataTypesV3} from "aave-address-book/AaveV3.sol";
-import {ILendingPool, DataTypes as DataTypesV2} from "aave-address-book/AaveV2.sol";
 import {IPoolSteward} from "./interfaces/IPoolSteward.sol";
 
 /**
@@ -18,8 +15,6 @@ import {IPoolSteward} from "./interfaces/IPoolSteward.sol";
  * @notice Manages deposits, withdrawals, and asset migrations between Aave V2 and Aave V3 pools
  */
 contract PoolSteward is OwnableWithGuardian, IPoolSteward {
-    using DataTypesV2 for DataTypesV2.ReserveData;
-    using DataTypesV3 for DataTypesV3.ReserveDataLegacy;
     using CU for ICollector;
     using CU for CU.IOInput;
 
