@@ -62,7 +62,7 @@ contract CollectorBudgetStewardTest is Test {
   CollectorBudgetSteward public steward;
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("mainnet"), 21244865);
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 21580838); // https://etherscan.io/block/21580838
     steward =
       new CollectorBudgetSteward(GovernanceV3Ethereum.EXECUTOR_LVL_1, guardian, address(AaveV3Ethereum.COLLECTOR));
 
