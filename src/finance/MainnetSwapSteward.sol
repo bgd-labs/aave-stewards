@@ -10,6 +10,23 @@ import {IAggregatorInterface} from "src/finance/interfaces/IAggregatorInterface.
 
 import {IMainnetSwapSteward} from "src/finance/interfaces/IMainnetSwapSteward.sol";
 
+/**
+ * @title MainnetSwapSteward
+ * @author luigy-lemon  (Karpatkey)
+ * @author efecarranza  (Tokenlogic)
+ * @notice Facilitates token swaps on behalf of the DAO Treasury using the AaveSwapper.
+ * Funds must be present in the AaveSwapper in order for them to be executed.
+ * The tokens that are to be swapped from/to are to be pre-approved via governance.
+ *
+ * -- Security Considerations
+ * Having previously set and validated oracles avoids mistakes that are easy to make when passing the necessary parameters to swap.
+ *
+ * -- Permissions
+ * The contract implements OwnableWithGuardian.
+ * The owner will always be the respective network Short Executor (governance).
+ * The guardian role will be given to a Financial Service provider of the DAO.
+ *
+ */
 contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
   using CU for CU.SwapInput;
 
