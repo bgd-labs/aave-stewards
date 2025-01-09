@@ -70,7 +70,7 @@ contract CollectorBudgetStewardTest is Test {
     vm.label(alice, "Alice");
     vm.label(guardian, "Guardian");
     vm.label(EXECUTOR, "Executor");
-    vm.label(address(steward), "PoolSteward");
+    vm.label(address(steward), "CollectorBudgetSteward");
 
     vm.startPrank(EXECUTOR);
     AaveV3Ethereum.COLLECTOR.setFundsAdmin(address(steward));
