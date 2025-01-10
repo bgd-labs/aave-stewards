@@ -29,11 +29,17 @@ contract MainnetSwapStewardTest is Test {
     address indexed recipient,
     uint256 slippage
   );
-  event SwapApprovedToken(address indexed token, address indexed oracleUSD);
+  event ApprovedToken(address indexed token, address indexed oracleUSD);
 
   address public constant USDC_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
   address public constant AAVE_PRICE_FEED = 0x547a514d5e3769680Ce22B2361c10Ea13619e8a9;
   address public constant EXECUTOR = 0x5300A1a15135EA4dc7aD5a167152C01EFc9b192A;
+
+  // https://etherscan.io/address/0x060373D064d0168931dE2AB8DDA7410923d06E88
+  address public constant MILKMAN = 0x060373D064d0168931dE2AB8DDA7410923d06E88;
+
+  // https://etherscan.io/address/0xe80a1C615F75AFF7Ed8F08c9F21f9d00982D666c
+  address public constant PRICE_CHECKER = 0xe80a1C615F75AFF7Ed8F08c9F21f9d00982D666c;
   address public constant alice = address(43);
   address public constant guardian = address(82);
 
@@ -42,7 +48,14 @@ contract MainnetSwapStewardTest is Test {
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("mainnet"), 21580838); // https://etherscan.io/block/21580838
 
-    steward = new MainnetSwapSteward(GovernanceV3Ethereum.EXECUTOR_LVL_1, guardian, address(AaveV3Ethereum.COLLECTOR));
+    steward = new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      guardian,
+      address(AaveV3Ethereum.COLLECTOR),
+      MiscEthereum.AAVE_SWAPPER,
+      MILKMAN,
+      PRICE_CHECKER
+    );
 
     vm.label(0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c, "Collector");
     vm.label(alice, "Alice");
@@ -89,7 +102,7 @@ contract Function_tokenSwap is MainnetSwapStewardTest {
     address mockOracle = address(new MockOracle());
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    vm.expectRevert(IMainnetSwapSteward.PriceFeedIncompatibility.selector);
+    vm.expectRevert(IMainnetSwapSteward.PriceFeedInvalidAnswer.selector);
     steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, mockOracle);
     vm.stopPrank();
   }
@@ -104,7 +117,7 @@ contract Function_tokenSwap is MainnetSwapStewardTest {
     vm.startPrank(guardian);
     vm.expectEmit(true, true, true, true, address(steward.SWAPPER()));
     emit SwapRequested(
-      steward.MILKMAN(),
+      steward.milkman(),
       AaveV3EthereumAssets.USDC_UNDERLYING,
       AaveV3EthereumAssets.AAVE_UNDERLYING,
       USDC_PRICE_FEED,
@@ -129,7 +142,7 @@ contract Function_setSwappableToken is MainnetSwapStewardTest {
 
   function test_resvertsIf_missingPriceFeed() public {
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    vm.expectRevert(IMainnetSwapSteward.MissingPriceFeed.selector);
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
     steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, address(0));
     vm.stopPrank();
   }
@@ -148,7 +161,7 @@ contract Function_setSwappableToken is MainnetSwapStewardTest {
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
 
     vm.expectEmit(true, true, true, true, address(steward));
-    emit SwapApprovedToken(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
+    emit ApprovedToken(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
     steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
     vm.stopPrank();
   }
@@ -170,10 +183,10 @@ contract SetPriceChecker is MainnetSwapStewardTest {
     address newChecker = makeAddr("new-checker");
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     vm.expectEmit(true, true, true, true, address(steward));
-    emit PriceCheckerUpdated(steward.PRICE_CHECKER(), newChecker);
+    emit PriceCheckerUpdated(steward.priceChecker(), newChecker);
     steward.setPriceChecker(newChecker);
 
-    assertEq(address(steward.PRICE_CHECKER()), newChecker);
+    assertEq(steward.priceChecker(), newChecker);
   }
 }
 
@@ -193,10 +206,10 @@ contract SetMilkman is MainnetSwapStewardTest {
     address newMilkman = makeAddr("new-milkman");
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     vm.expectEmit(true, true, true, true, address(steward));
-    emit MilkmanAddressUpdated(steward.MILKMAN(), newMilkman);
+    emit MilkmanAddressUpdated(steward.milkman(), newMilkman);
     steward.setMilkman(newMilkman);
 
-    assertEq(address(steward.MILKMAN()), newMilkman);
+    assertEq(steward.milkman(), newMilkman);
   }
 }
 

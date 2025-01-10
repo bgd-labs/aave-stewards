@@ -40,10 +40,10 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
   ICollector public immutable COLLECTOR;
 
   /// @inheritdoc IMainnetSwapSteward
-  address public MILKMAN;
+  address public milkman;
 
   /// @inheritdoc IMainnetSwapSteward
-  address public PRICE_CHECKER;
+  address public priceChecker;
 
   /// @inheritdoc IMainnetSwapSteward
   mapping(address token => bool isApproved) public swapApprovedToken;
@@ -51,18 +51,21 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
   /// @inheritdoc IMainnetSwapSteward
   mapping(address token => address oracle) public priceOracle;
 
-  constructor(address _owner, address _guardian, address collector) {
+  constructor(
+    address _owner,
+    address _guardian,
+    address _collector,
+    address _swapper,
+    address _milkman,
+    address _priceChecker
+  ) {
     _transferOwnership(_owner);
     _updateGuardian(_guardian);
+    _setMilkman(_milkman);
+    _setPriceChecker(_priceChecker);
 
-    COLLECTOR = ICollector(collector);
-    SWAPPER = AaveSwapper(MiscEthereum.AAVE_SWAPPER);
-
-    // https://etherscan.io/address/0x060373D064d0168931dE2AB8DDA7410923d06E88
-    _setMilkman(0x060373D064d0168931dE2AB8DDA7410923d06E88);
-
-    // https://etherscan.io/address/0xe80a1C615F75AFF7Ed8F08c9F21f9d00982D666c
-    _setPriceChecker(0xe80a1C615F75AFF7Ed8F08c9F21f9d00982D666c);
+    COLLECTOR = ICollector(_collector);
+    SWAPPER = AaveSwapper(_swapper);
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -73,7 +76,7 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
     _validateSwap(sellToken, amount, buyToken, slippage);
 
     CU.SwapInput memory swapData = CU.SwapInput(
-      MILKMAN, PRICE_CHECKER, sellToken, buyToken, priceOracle[sellToken], priceOracle[buyToken], amount, slippage
+      milkman, priceChecker, sellToken, buyToken, priceOracle[sellToken], priceOracle[buyToken], amount, slippage
     );
 
     CU.swap(COLLECTOR, address(SWAPPER), swapData);
@@ -81,20 +84,20 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
 
   /// @inheritdoc IMainnetSwapSteward
   function setSwappableToken(address token, address priceFeedUSD) external onlyOwner {
-    if (priceFeedUSD == address(0)) revert MissingPriceFeed();
+    if (priceFeedUSD == address(0)) revert InvalidZeroAddress();
 
     swapApprovedToken[token] = true;
     priceOracle[token] = priceFeedUSD;
 
     // Validate oracle has necessary functions
     if (IAggregatorInterface(priceFeedUSD).decimals() != 8) {
-      revert PriceFeedIncompatibility();
+      revert PriceFeedIncompatibleDecimals();
     }
     if (IAggregatorInterface(priceFeedUSD).latestAnswer() == 0) {
-      revert PriceFeedIncompatibility();
+      revert PriceFeedInvalidAnswer();
     }
 
-    emit SwapApprovedToken(token, priceFeedUSD);
+    emit ApprovedToken(token, priceFeedUSD);
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -110,8 +113,8 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
   /// @dev Internal function to set the price checker
   function _setPriceChecker(address newPriceChecker) internal {
     if (newPriceChecker == address(0)) revert InvalidZeroAddress();
-    address old = PRICE_CHECKER;
-    PRICE_CHECKER = newPriceChecker;
+    address old = priceChecker;
+    priceChecker = newPriceChecker;
 
     emit PriceCheckerUpdated(old, newPriceChecker);
   }
@@ -119,8 +122,8 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
   /// @dev Internal function to set the Milkman instance address
   function _setMilkman(address newMilkman) internal {
     if (newMilkman == address(0)) revert InvalidZeroAddress();
-    address old = MILKMAN;
-    MILKMAN = newMilkman;
+    address old = milkman;
+    milkman = newMilkman;
 
     emit MilkmanAddressUpdated(old, newMilkman);
   }

@@ -14,14 +14,14 @@ interface IMainnetSwapSteward {
   /// @dev Amount cannot be zero
   error InvalidZeroAmount();
 
-  /// @dev Oracle cannot be the zero-address
-  error MissingPriceFeed();
-
   /// @dev Oracle did not return a valid value
   error PriceFeedFailure();
 
-  /// @dev Oracle is returning unexpected values
-  error PriceFeedIncompatibility();
+  /// @dev Oracle does not have correct number of decimals
+  error PriceFeedIncompatibleDecimals();
+
+  /// @dev Oracle is returning unexpected value
+  error PriceFeedInvalidAnswer();
 
   /// @dev Token has not been previously approved for swapping
   error UnrecognizedToken();
@@ -39,7 +39,7 @@ interface IMainnetSwapSteward {
   /// @notice Emitted when a token is approved for swapping with its corresponding USD oracle
   /// @param token The address of the token approved for swapping
   /// @param oracleUSD The address of the oracle providing the USD price feed for the token
-  event SwapApprovedToken(address indexed token, address indexed oracleUSD);
+  event ApprovedToken(address indexed token, address indexed oracleUSD);
 
   /// @notice Returns instance of Aave V3 Collector
   function COLLECTOR() external view returns (ICollector);
@@ -51,10 +51,10 @@ interface IMainnetSwapSteward {
   function SWAPPER() external view returns (AaveSwapper);
 
   /// @notice Returns the address of the Milkman contract
-  function MILKMAN() external view returns (address);
+  function milkman() external view returns (address);
 
   /// @notice Returns address of the price checker used for swaps
-  function PRICE_CHECKER() external view returns (address);
+  function priceChecker() external view returns (address);
 
   /// @notice Returns whether token is approved to be swapped from/to
   /// @param token Address of the token to swap from/to
