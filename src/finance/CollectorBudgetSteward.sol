@@ -16,6 +16,11 @@ import {ICollectorBudgetSteward} from "./interfaces/ICollectorBudgetSteward.sol"
  * The budget is provided per token.
  * The budgets must be reset via governance once expired (or as needed for sizeable transactions).
  *
+ * The funds can only be received by governance approved addresses. An example scenario is as follows: the DAO approved 1M GHO, and 5 addresses.
+ * The stewards then create a stream to a service provider for 500k GHO, transfer 10k GHO for incentives, and 2k GHO for gas-refunds to providers.
+ * The stewards then have 488k GHO at their disposal. A DAO controller multi-sig can also be a beneficiary to handle smaller payments such as
+ * bounty payouts to bug platforms and other ad hoc expenses.
+ *
  * -- Permissions
  * The contract implements OwnableWithGuardian.
  * The owner will always be the respective network Short Executor (governance).
