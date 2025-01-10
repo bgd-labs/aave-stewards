@@ -14,9 +14,6 @@ interface IMainnetSwapSteward {
   /// @dev Amount cannot be zero
   error InvalidZeroAmount();
 
-  /// @dev Oracle did not return a valid value
-  error PriceFeedFailure();
-
   /// @dev Oracle does not have correct number of decimals
   error PriceFeedIncompatibleDecimals();
 

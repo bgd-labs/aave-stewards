@@ -142,7 +142,7 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
       IAggregatorInterface(priceOracle[buyToken]).latestAnswer() == 0
         || IAggregatorInterface(priceOracle[sellToken]).latestAnswer() == 0
     ) {
-      revert PriceFeedFailure();
+      revert PriceFeedInvalidAnswer();
     }
   }
 }
