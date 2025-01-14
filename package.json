@@ -1,0 +1,23 @@
+{
+  "name": "aave-stewards",
+  "version": "1.0.0",
+  "scripts": {
+    "lint": "prettier . --check",
+    "lint:fix": "prettier . --write"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bgd-labs/aave-stewards.git"
+  },
+  "author": "BGD Labs for Aave",
+  "license": "BUSL-1.1",
+  "bugs": {
+    "url": "https://github.com/bgd-labs/aave-stewards/issues"
+  },
+  "homepage": "https://github.com/bgd-labs/aave-stewards#readme",
+  "type": "module",
+  "dependencies": {
+    "prettier": "^3.4.2",
+    "prettier-plugin-solidity": "^1.4.2"
+  }
+}
