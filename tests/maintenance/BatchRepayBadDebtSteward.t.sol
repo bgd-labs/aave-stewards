@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 
 import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
-import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
+import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 
 import {IBatchRepayBadDebtSteward} from "../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol";
@@ -13,29 +13,37 @@ import {BatchRepayBadDebtSteward} from "../../src/maintenance/BatchRepayBadDebtS
 contract BatchRepayBadDebtStewardTest is Test {
   BatchRepayBadDebtSteward public steward;
 
-  address public assetUnderlying = AaveV3EthereumAssets.DAI_UNDERLYING;
-  address public assetDebtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
+  address public assetUnderlying = AaveV3AvalancheAssets.BTCb_UNDERLYING;
+  address public assetDebtToken = AaveV3AvalancheAssets.BTCb_V_TOKEN;
 
-  address[] public usersWithBadDebt = [0x3AA228a80F50763045BDfc45012dA124Bd0a6809];
+  address[] public usersWithBadDebt = [
+    0x233bA87Cb5180fcCf86ac8Dd19CE07d09732DD39,
+    0x20Bb103F0688D434d80336010b7F5feA22B8480E,
+    0x9D4Ad74b46675998321101b2a49a4D66ac7509Ea,
+    0xCb87dD67Fe09121abd335044a1e0d6bf44C915FB,
+    0xd3D97E2cbF1fc09528830F58BCA6DbC4cc74bA14,
+    0xd80aC14a778f4A708dcda53D9B03e1A66B551872
+  ];
   uint256 totalBadDebt;
   uint256[] public usersBadDebtAmounts;
 
   address[] public usersWithGoodDebt = [
-    0x2f97Ab5471F4d621ba93B919f487F8E81E2F14A1,
-    0xea5d380A6Ec5C42fdE8969A0eb64BF2f90aFadAA,
-    0xBbF308c4b21D808dDa7DaaD698aff46156C6f814,
-    0x7d7921e2804fEfaE14B32849bB0bc679966Bc5C7,
-    0xC4caf4D21556958cff2c51D62c31FE00c58ff8dD
+    0x37592B2927c40C4B0054614D7FF6065D6B752a8C,
+    0x5fb6Fd8125023c7c4f8FFC8b636a658ad8C1b4eF,
+    0x20ed4EF75cE723A580D250005a00DfC86F03112a,
+    0x1C943ffC835bFcCd2a435e7bE3507eF821aC06e2,
+    0x87F8A29eB20D5DB98dE07301345b48E1e9DDa569,
+    0x97F0d7f9d9e7Fe4BFBAbc04BE336dc058873A0E8
   ];
 
   address public repayer = address(0x100);
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("mainnet"), 21621207); // https://etherscan.io/block/21621207
+    vm.createSelectFork(vm.rpcUrl("avalanche"), 55793443); // https://snowscan.xyz/block/55793443
 
-    steward = new BatchRepayBadDebtSteward(address(AaveV3Ethereum.POOL));
+    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL));
 
-    vm.label(address(AaveV3Ethereum.POOL), "Pool");
+    vm.label(address(AaveV3Avalanche.POOL), "Pool");
     vm.label(address(steward), "BatchRepayBadDebtSteward");
     vm.label(repayer, "Repayer");
     vm.label(assetUnderlying, "AssetUnderlying");

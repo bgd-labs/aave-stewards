@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IPool, DataTypes} from "aave-address-book/AaveV3.sol";
 
-import {UserConfiguration} from "aave-v3-origin/core/contracts/protocol/libraries/configuration/UserConfiguration.sol";
+import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
 
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
