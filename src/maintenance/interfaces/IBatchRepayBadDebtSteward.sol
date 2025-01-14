@@ -4,14 +4,6 @@ pragma solidity ^0.8.0;
 import {IPool} from "aave-address-book/AaveV3.sol";
 
 interface IBatchRepayBadDebtSteward {
-  /* EVENTS */
-
-  /// @notice Emitted when a user has been repaid his bad debt
-  /// @param user The address of the user
-  /// @param asset The address of the asset
-  /// @param amount The amount repaid
-  event UserBadDebtRepaid(address indexed user, address indexed asset, uint256 amount);
-
   /* ERRORS */
 
   /// @notice Thrown when a user has some collateral

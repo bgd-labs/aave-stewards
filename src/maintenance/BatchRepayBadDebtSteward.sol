@@ -41,8 +41,6 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
     uint256 length = users.length;
     for (uint256 i = 0; i < length; i++) {
       POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
-
-      emit UserBadDebtRepaid({user: users[i], asset: asset, amount: debtAmounts[i]});
     }
   }
 

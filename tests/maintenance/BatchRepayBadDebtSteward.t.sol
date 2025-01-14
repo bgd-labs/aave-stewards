@@ -74,15 +74,6 @@ contract BatchRepayBadDebtStewardTest is Test {
   }
 
   function test_batchRepayBadDebt() public {
-    for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
-      vm.expectEmit(address(steward));
-      emit IBatchRepayBadDebtSteward.UserBadDebtRepaid({
-        user: usersWithBadDebt[i],
-        asset: assetUnderlying,
-        amount: usersBadDebtAmounts[i]
-      });
-    }
-
     vm.prank(repayer);
     steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt);
 
