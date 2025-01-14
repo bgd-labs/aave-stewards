@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from 'forge-std/Test.sol';
+import {Test} from "forge-std/Test.sol";
 
-import {IPool, IAToken, DataTypes} from 'aave-address-book/AaveV3.sol';
-import {AaveV3Ethereum, AaveV3EthereumAssets} from 'aave-address-book/AaveV3Ethereum.sol';
-import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
+import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
+import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
+import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 
-import {IBatchRepayBadDebtSteward} from '../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol';
-import {BatchRepayBadDebtSteward} from '../../src/maintenance/BatchRepayBadDebtSteward.sol';
+import {IBatchRepayBadDebtSteward} from "../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol";
+import {BatchRepayBadDebtSteward} from "../../src/maintenance/BatchRepayBadDebtSteward.sol";
 
 contract BatchRepayBadDebtStewardTest is Test {
   BatchRepayBadDebtSteward public steward;
@@ -31,15 +31,15 @@ contract BatchRepayBadDebtStewardTest is Test {
   address public repayer = address(0x100);
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl('mainnet'), 21621207); // https://etherscan.io/block/21621207
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 21621207); // https://etherscan.io/block/21621207
 
     steward = new BatchRepayBadDebtSteward(address(AaveV3Ethereum.POOL));
 
-    vm.label(address(AaveV3Ethereum.POOL), 'Pool');
-    vm.label(address(steward), 'BatchRepayBadDebtSteward');
-    vm.label(repayer, 'Repayer');
-    vm.label(assetUnderlying, 'AssetUnderlying');
-    vm.label(assetDebtToken, 'AssetDebtToken');
+    vm.label(address(AaveV3Ethereum.POOL), "Pool");
+    vm.label(address(steward), "BatchRepayBadDebtSteward");
+    vm.label(repayer, "Repayer");
+    vm.label(assetUnderlying, "AssetUnderlying");
+    vm.label(assetDebtToken, "AssetDebtToken");
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]);
@@ -54,8 +54,8 @@ contract BatchRepayBadDebtStewardTest is Test {
   }
 
   function test_getBadDebtAmount() public view {
-    (uint256 receivedTotalBadDebt, uint256[] memory receivedUsersBadDebtAmounts) = steward
-      .getBadDebtAmount(assetUnderlying, usersWithBadDebt);
+    (uint256 receivedTotalBadDebt, uint256[] memory receivedUsersBadDebtAmounts) =
+      steward.getBadDebtAmount(assetUnderlying, usersWithBadDebt);
 
     assertEq(receivedTotalBadDebt, totalBadDebt);
     assertEq(receivedUsersBadDebtAmounts.length, usersBadDebtAmounts.length);
@@ -91,10 +91,7 @@ contract BatchRepayBadDebtStewardTest is Test {
     passedArray[1] = usersWithBadDebt[0];
 
     vm.expectRevert(
-      abi.encodePacked(
-        IBatchRepayBadDebtSteward.UsersShouldBeDifferent.selector,
-        uint256(uint160(passedArray[0]))
-      )
+      abi.encodePacked(IBatchRepayBadDebtSteward.UsersShouldBeDifferent.selector, uint256(uint160(passedArray[0])))
     );
 
     steward.getBadDebtAmount(assetUnderlying, passedArray);
@@ -102,10 +99,7 @@ contract BatchRepayBadDebtStewardTest is Test {
 
   function test_reverts_getBadDebtAmount_userHasSomeCollateral() public {
     vm.expectRevert(
-      abi.encodePacked(
-        IBatchRepayBadDebtSteward.UserHasSomeCollateral.selector,
-        uint256(uint160(usersWithGoodDebt[0]))
-      )
+      abi.encodePacked(IBatchRepayBadDebtSteward.UserHasSomeCollateral.selector, uint256(uint160(usersWithGoodDebt[0])))
     );
 
     steward.getBadDebtAmount(assetUnderlying, usersWithGoodDebt);
@@ -116,10 +110,7 @@ contract BatchRepayBadDebtStewardTest is Test {
     passedArray[0] = repayer;
 
     vm.expectRevert(
-      abi.encodePacked(
-        IBatchRepayBadDebtSteward.UserHasNoDebt.selector,
-        uint256(uint160(passedArray[0]))
-      )
+      abi.encodePacked(IBatchRepayBadDebtSteward.UserHasNoDebt.selector, uint256(uint160(passedArray[0])))
     );
 
     steward.getBadDebtAmount(assetUnderlying, passedArray);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPool} from 'aave-address-book/AaveV3.sol';
+import {IPool} from "aave-address-book/AaveV3.sol";
 
 interface IBatchRepayBadDebtSteward {
   /* EVENTS */
@@ -47,8 +47,8 @@ interface IBatchRepayBadDebtSteward {
   /// @param users The addresses of the users to repay
   /// @return totalDebtAmount The total debt amount
   /// @return debtAmounts The debt amounts of the users
-  function getBadDebtAmount(
-    address asset,
-    address[] memory users
-  ) external view returns (uint256 totalDebtAmount, uint256[] memory debtAmounts);
+  function getBadDebtAmount(address asset, address[] memory users)
+    external
+    view
+    returns (uint256 totalDebtAmount, uint256[] memory debtAmounts);
 }

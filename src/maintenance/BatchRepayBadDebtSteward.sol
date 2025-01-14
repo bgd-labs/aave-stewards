@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPool, DataTypes} from 'aave-address-book/AaveV3.sol';
-import {IERC20} from 'solidity-utils/contracts/oz-common/interfaces/IERC20.sol';
-import {SafeERC20} from 'solidity-utils/contracts/oz-common/SafeERC20.sol';
+import {IPool, DataTypes} from "aave-address-book/AaveV3.sol";
+import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
+import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
 
-import {IBatchRepayBadDebtSteward} from './interfaces/IBatchRepayBadDebtSteward.sol';
+import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.sol";
 
 /// @title BatchRepayBadDebtSteward
 /// @author BGD Labs
@@ -45,10 +45,12 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
   /* PUBLIC VIEW FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
-  function getBadDebtAmount(
-    address asset,
-    address[] memory users
-  ) public view override returns (uint256, uint256[] memory) {
+  function getBadDebtAmount(address asset, address[] memory users)
+    public
+    view
+    override
+    returns (uint256, uint256[] memory)
+  {
     uint256 length = users.length;
 
     uint256 totalDebtAmount;
@@ -65,7 +67,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
         }
       }
 
-      (uint256 totalCollateralBase, uint256 totalDebtBase, , , , ) = POOL.getUserAccountData(user);
+      (uint256 totalCollateralBase, uint256 totalDebtBase,,,,) = POOL.getUserAccountData(user);
 
       if (totalCollateralBase > 0) {
         revert UserHasSomeCollateral(user);
@@ -75,9 +77,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
         revert UserHasNoDebt(user);
       }
 
-      totalDebtAmount += debtAmounts[i] = IERC20(reserveData.variableDebtTokenAddress).balanceOf(
-        user
-      );
+      totalDebtAmount += debtAmounts[i] = IERC20(reserveData.variableDebtTokenAddress).balanceOf(user);
     }
 
     return (totalDebtAmount, debtAmounts);
