@@ -13,10 +13,10 @@ import {BatchRepayBadDebtSteward} from "../../src/maintenance/BatchRepayBadDebtS
 contract BatchRepayBadDebtStewardTest is Test {
   BatchRepayBadDebtSteward public steward;
 
-  address public assetUnderlying = AaveV3EthereumAssets.WETH_UNDERLYING;
-  address public assetDebtToken = AaveV3EthereumAssets.WETH_V_TOKEN;
+  address public assetUnderlying = AaveV3EthereumAssets.DAI_UNDERLYING;
+  address public assetDebtToken = AaveV3EthereumAssets.DAI_V_TOKEN;
 
-  address[] public usersWithBadDebt = [0x2882ddAF89baca105E704C01d20F80227F9aD3ed];
+  address[] public usersWithBadDebt = [0x3AA228a80F50763045BDfc45012dA124Bd0a6809];
   uint256 totalBadDebt;
   uint256[] public usersBadDebtAmounts;
 

@@ -2,6 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {IPool, DataTypes} from "aave-address-book/AaveV3.sol";
+
+import {UserConfiguration} from "aave-v3-origin/core/contracts/protocol/libraries/configuration/UserConfiguration.sol";
+
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
 
@@ -13,6 +16,7 @@ import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.
 /// @dev Only allowed those users that have some debt and doesn't have any collateral
 contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
   using SafeERC20 for IERC20;
+  using UserConfiguration for DataTypes.UserConfigurationMap;
 
   /* PUBLIC GLOBAL VARIABLES */
 
@@ -67,13 +71,13 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
         }
       }
 
-      (uint256 totalCollateralBase, uint256 totalDebtBase,,,,) = POOL.getUserAccountData(user);
+      DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
 
-      if (totalCollateralBase > 0) {
+      if (userConfiguration.isUsingAsCollateralAny()) {
         revert UserHasSomeCollateral(user);
       }
 
-      if (totalDebtBase == 0) {
+      if (!userConfiguration.isBorrowingAny()) {
         revert UserHasNoDebt(user);
       }
 
