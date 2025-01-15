@@ -103,15 +103,4 @@ contract BatchRepayBadDebtStewardTest is Test {
 
     steward.getBadDebtAmount(assetUnderlying, usersWithGoodDebt);
   }
-
-  function test_reverts_getBadDebtAmount_userHasNoDebt() public {
-    address[] memory passedArray = new address[](1);
-    passedArray[0] = repayer;
-
-    vm.expectRevert(
-      abi.encodePacked(IBatchRepayBadDebtSteward.UserHasNoDebt.selector, uint256(uint160(passedArray[0])))
-    );
-
-    steward.getBadDebtAmount(assetUnderlying, passedArray);
-  }
 }

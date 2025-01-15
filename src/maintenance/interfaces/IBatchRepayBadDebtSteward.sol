@@ -10,10 +10,6 @@ interface IBatchRepayBadDebtSteward {
   /// @param user The address of the user
   error UserHasSomeCollateral(address user);
 
-  /// @notice Thrown when a user has no debt
-  /// @param user The address of the user
-  error UserHasNoDebt(address user);
-
   /// @notice Thrown when an array contains two users with the same address
   /// @param user The address of the user
   error UsersShouldBeDifferent(address user);

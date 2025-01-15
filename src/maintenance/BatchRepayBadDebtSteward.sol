@@ -75,10 +75,6 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
         revert UserHasSomeCollateral(user);
       }
 
-      if (!userConfiguration.isBorrowingAny()) {
-        revert UserHasNoDebt(user);
-      }
-
       totalDebtAmount += debtAmounts[i] = IERC20(reserveData.variableDebtTokenAddress).balanceOf(user);
     }
 

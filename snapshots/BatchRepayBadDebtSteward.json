@@ -1,15 +1,15 @@
 {
   "function batchRepayBadDebt: with 0 users": "89080",
-  "function batchRepayBadDebt: with 1 user": "228429",
-  "function batchRepayBadDebt: with 2 users": "291380",
-  "function batchRepayBadDebt: with 3 users": "354472",
-  "function batchRepayBadDebt: with 4 users": "417703",
-  "function batchRepayBadDebt: with 5 users": "481075",
-  "function batchRepayBadDebt: with 6 users": "544587",
+  "function batchRepayBadDebt: with 1 user": "228348",
+  "function batchRepayBadDebt: with 2 users": "291218",
+  "function batchRepayBadDebt: with 3 users": "354229",
+  "function batchRepayBadDebt: with 4 users": "417379",
+  "function batchRepayBadDebt: with 5 users": "480670",
+  "function batchRepayBadDebt: with 6 users": "544101",
   "function getBadDebtAmount: with 0 users": "43154",
-  "function getBadDebtAmount: with 1 user": "65262",
-  "function getBadDebtAmount: with 2 users": "78458",
-  "function getBadDebtAmount: with 4 users": "105271",
-  "function getBadDebtAmount: with 5 users": "118887",
-  "function getBadDebtAmount: with 6 users": "132644"
+  "function getBadDebtAmount: with 1 user": "65181",
+  "function getBadDebtAmount: with 2 users": "78296",
+  "function getBadDebtAmount: with 4 users": "104947",
+  "function getBadDebtAmount: with 5 users": "118482",
+  "function getBadDebtAmount: with 6 users": "132158"
 }
