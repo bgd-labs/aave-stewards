@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
-import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
-import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
 import {IPoolExposureSteward} from "./interfaces/IPoolExposureSteward.sol";
 
 /**
@@ -66,8 +63,7 @@ contract PoolExposureSteward is OwnableWithGuardian, IPoolExposureSteward {
   function depositV3(address pool, address reserve, uint256 amount) external onlyOwnerOrGuardian {
     _validateV3Pool(pool);
 
-    CU.IOInput memory depositData = CU.IOInput(pool, reserve, amount);
-    CU.depositToV3(COLLECTOR, depositData);
+    CU.depositToV3(COLLECTOR, CU.IOInput({pool: pool, underlying: reserve, amount: amount}));
   }
 
   /// @inheritdoc IPoolExposureSteward
@@ -79,38 +75,70 @@ contract PoolExposureSteward is OwnableWithGuardian, IPoolExposureSteward {
   }
 
   /// @inheritdoc IPoolExposureSteward
-  function withdrawV2(address pool, address reserve, uint256 amount) external onlyOwnerOrGuardian {
+  function withdrawV2(address pool, address underlying, uint256 amount) external onlyOwnerOrGuardian {
     _validateV2Pool(pool);
 
-    CU.IOInput memory withdrawData = CU.IOInput(pool, reserve, amount);
-    CU.withdrawFromV2(COLLECTOR, withdrawData, address(COLLECTOR));
+    CU.withdrawFromV2(COLLECTOR, CU.IOInput(pool, underlying, amount), address(COLLECTOR));
   }
 
   /// @inheritdoc IPoolExposureSteward
-  function migrateBetweenV3(address fromPool, address toPool, address reserve, uint256 amount)
+  function migrateV2toV3(address v2Pool, address v3Pool, address underlying, uint256 amount)
+    external
+    onlyOwnerOrGuardian
+  {
+    _validateV2Pool(v2Pool);
+    _validateV3Pool(v3Pool);
+    _migrateV2toV3(v2Pool, v3Pool, underlying, amount);
+  }
+
+  /// @inheritdoc IPoolExposureSteward
+  function migrateV2toV3(address v2Pool, address v3Pool, address[] calldata underlyings, uint256[] calldata amounts)
+    external
+    onlyOwnerOrGuardian
+  {
+    _validateV2Pool(v2Pool);
+    _validateV3Pool(v3Pool);
+
+    uint256 underlyingsLength = underlyings.length;
+
+    if (underlyingsLength != amounts.length) {
+      revert MismatchingArrayLength();
+    }
+
+    for (uint256 i; i < underlyingsLength; ++i) {
+      _migrateV2toV3(v2Pool, v3Pool, underlyings[i], amounts[i]);
+    }
+  }
+
+  /// @inheritdoc IPoolExposureSteward
+  function migrateBetweenV3(address fromPool, address toPool, address underlying, uint256 amount)
     external
     onlyOwnerOrGuardian
   {
     _validateV3Pool(fromPool);
     _validateV3Pool(toPool);
-
-    CU.IOInput memory withdrawData = CU.IOInput(fromPool, reserve, amount);
-    uint256 withdrawnAmt = CU.withdrawFromV3(COLLECTOR, withdrawData, address(COLLECTOR));
-
-    CU.IOInput memory depositData = CU.IOInput(toPool, reserve, withdrawnAmt);
-    CU.depositToV3(COLLECTOR, depositData);
+    _migrateBetweenV3(fromPool, toPool, underlying, amount);
   }
 
   /// @inheritdoc IPoolExposureSteward
-  function migrateV2toV3(address v2Pool, address v3Pool, address reserve, uint256 amount) external onlyOwnerOrGuardian {
-    _validateV2Pool(v2Pool);
-    _validateV3Pool(v3Pool);
+  function migrateBetweenV3(
+    address fromPool,
+    address toPool,
+    address[] calldata underlyings,
+    uint256[] calldata amounts
+  ) external onlyOwnerOrGuardian {
+    _validateV3Pool(fromPool);
+    _validateV3Pool(toPool);
 
-    CU.IOInput memory withdrawData = CU.IOInput(v2Pool, reserve, amount);
-    uint256 withdrawnAmt = CU.withdrawFromV2(COLLECTOR, withdrawData, address(COLLECTOR));
+    uint256 underlyingsLength = underlyings.length;
 
-    CU.IOInput memory depositData = CU.IOInput(v3Pool, reserve, withdrawnAmt);
-    CU.depositToV3(COLLECTOR, depositData);
+    if (underlyingsLength != amounts.length) {
+      revert MismatchingArrayLength();
+    }
+
+    for (uint256 i; i < underlyingsLength; ++i) {
+      _migrateBetweenV3(fromPool, toPool, underlyings[i], amounts[i]);
+    }
   }
 
   /// DAO Actions
@@ -138,6 +166,20 @@ contract PoolExposureSteward is OwnableWithGuardian, IPoolExposureSteward {
       poolsV2[pool] = true;
       emit ApprovedV2Pool(pool);
     }
+  }
+
+  /// @dev Internal function to perform migration
+  function _migrateV2toV3(address v2Pool, address v3Pool, address underlying, uint256 amount) internal {
+    uint256 withdrawnAmt = CU.withdrawFromV2(COLLECTOR, CU.IOInput(v2Pool, underlying, amount), address(COLLECTOR));
+
+    CU.depositToV3(COLLECTOR, CU.IOInput(v3Pool, underlying, withdrawnAmt));
+  }
+
+  /// @dev Internal function to migrate between V3 pools
+  function _migrateBetweenV3(address fromPool, address toPool, address underlying, uint256 amount) internal {
+    uint256 withdrawnAmt = CU.withdrawFromV3(COLLECTOR, CU.IOInput(fromPool, underlying, amount), address(COLLECTOR));
+
+    CU.depositToV3(COLLECTOR, CU.IOInput(toPool, underlying, withdrawnAmt));
   }
 
   /// @dev Internal function to approve an Aave V3 Pool instance

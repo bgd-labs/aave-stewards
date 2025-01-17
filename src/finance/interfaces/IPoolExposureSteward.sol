@@ -7,11 +7,11 @@ interface IPoolExposureSteward {
   /// @dev Provided address cannot be the zero-address
   error InvalidZeroAddress();
 
+  /// @dev Provided arrays do not have the same length
+  error MismatchingArrayLength();
+
   /// @dev Aave Pool must have been previously approved
   error UnrecognizedPool();
-
-  /// @dev Could not identify V2 Pool
-  error V2PoolNotFound();
 
   /// @notice Emitted when a new V2 Pool gets listed
   /// @param pool The address of the new pool
@@ -54,31 +54,51 @@ interface IPoolExposureSteward {
 
   /// @notice Withdraws a specified amount of a reserve token from Aave V3
   /// @param V3Pool The address of the V3 pool to withdraw from
-  /// @param reserve The address of the reserve token to withdraw
+  /// @param underlying The address of the reserve token to withdraw
   /// @param amount The amount of the reserve token to withdraw
-  function withdrawV3(address V3Pool, address reserve, uint256 amount) external;
+  function withdrawV3(address V3Pool, address underlying, uint256 amount) external;
 
   /// @notice Migrates a specified amount of a reserve token from Aave V2 to Aave V3
-  /// @param poolV2 The address of the origin V2 Pool
-  /// @param poolV3 The address of the destination V3 Pool
-  /// @param reserve The address of the reserve token
+  /// @param v2Pool The address of the origin V2 Pool
+  /// @param v3Pool The address of the destination V3 Pool
+  /// @param underlying The address of the reserve token
   /// @param amount The amount of the reserve token to migrate
-  function migrateV2toV3(address poolV2, address poolV3, address reserve, uint256 amount) external;
+  function migrateV2toV3(address v2Pool, address v3Pool, address underlying, uint256 amount) external;
+
+  /// @notice Migrates specified amounts of various reserve tokens from Aave V2 to Aave V3
+  /// @param v2Pool The address of the origin V2 Pool
+  /// @param v3Pool The address of the destination V3 Pool
+  /// @param underlyings Array with the addresses of the reserve tokens
+  /// @param amounts Array with the amounts of the reserve tokens to migrate
+  function migrateV2toV3(address v2Pool, address v3Pool, address[] calldata underlyings, uint256[] calldata amounts)
+    external;
 
   /// @notice Migrates a specified amount of a reserve token from an Aave V3 instance to another
   /// @param fromPool The address of the origin V3 Pool
   /// @param toPool The address of the destination V3 Pool
-  /// @param reserve The address of the reserve token
+  /// @param underlying The address of the reserve token
   /// @param amount The amount of the reserve token to migrate
-  function migrateBetweenV3(address fromPool, address toPool, address reserve, uint256 amount) external;
+  function migrateBetweenV3(address fromPool, address toPool, address underlying, uint256 amount) external;
+
+  /// @notice Migrates a specified amount of a reserve token from an Aave V3 instance to another
+  /// @param fromPool The address of the origin V3 Pool
+  /// @param toPool The address of the destination V3 Pool
+  /// @param underlyings Array with the addresses of the reserve tokens
+  /// @param amounts Array with the amounts of the reserve tokens to migrate
+  function migrateBetweenV3(
+    address fromPool,
+    address toPool,
+    address[] calldata underlyings,
+    uint256[] calldata amounts
+  ) external;
 
   /// @notice Approves the permission to use a new pool
   /// @param pool Address of the new Pool
-  /// @param version3 True if new pool is a V3 isntance
+  /// @param version3 True if new pool is a V3 instance
   function approvePool(address pool, bool version3) external;
 
   /// @notice Revokes the permission to use a pool
   /// @param pool Address of the Pool to remove
-  /// @param version3 True if new pool is a V3 isntance
+  /// @param version3 True if new pool is a V3 instance
   function revokePool(address pool, bool version3) external;
 }

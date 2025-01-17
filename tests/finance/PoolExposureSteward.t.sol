@@ -6,11 +6,10 @@ import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 import {Ownable} from "solidity-utils/contracts/oz-common/Ownable.sol";
 import {GovernanceV3Ethereum} from "aave-address-book/GovernanceV3Ethereum.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
+import {AaveV3EthereumLido} from "aave-address-book/AaveV3EthereumLido.sol";
 import {AaveV3EthereumEtherFi, AaveV3EthereumEtherFiAssets} from "aave-address-book/AaveV3EthereumEtherFi.sol";
 import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
-import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
 import {CollectorUtils} from "aave-helpers/src/CollectorUtils.sol";
-import {ICollector} from "aave-address-book/common/ICollector.sol";
 
 import {PoolExposureSteward, IPoolExposureSteward} from "src/finance/PoolExposureSteward.sol";
 
@@ -19,8 +18,6 @@ import {PoolExposureSteward, IPoolExposureSteward} from "src/finance/PoolExposur
  * command: forge test -vvv --match-path tests/finance/PoolSteward.t.sol
  */
 contract PoolExposureStewardTest is Test {
-  event MinimumTokenBalanceUpdated(address indexed token, uint256 newAmount);
-  event Upgraded(address indexed impl);
   event ApprovedV2Pool(address indexed pool);
   event ApprovedV3Pool(address indexed pool);
   event RevokedV2Pool(address indexed pool);
@@ -42,12 +39,12 @@ contract PoolExposureStewardTest is Test {
     address[] memory v3Pools = new address[](3);
     v3Pools[0] = address(AaveV3Ethereum.POOL);
     v3Pools[1] = address(AaveV3EthereumEtherFi.POOL);
-    v3Pools[2] = 0x4e033931ad43597d96D6bcc25c280717730B58B1;
+    v3Pools[2] = address(AaveV3EthereumLido.POOL);
     steward = new PoolExposureSteward(
       GovernanceV3Ethereum.EXECUTOR_LVL_1, guardian, address(AaveV3Ethereum.COLLECTOR), v2Pools, v3Pools
     );
 
-    vm.label(0x464C71f6c2F760DdA6093dCB91C24c39e5d6e18c, "Collector");
+    vm.label(address(AaveV3Ethereum.COLLECTOR), "Collector");
     vm.label(alice, "Alice");
     vm.label(guardian, "Guardian");
     vm.label(EXECUTOR, "Executor");
@@ -55,7 +52,6 @@ contract PoolExposureStewardTest is Test {
 
     vm.startPrank(EXECUTOR);
     AaveV3Ethereum.COLLECTOR.setFundsAdmin(address(steward));
-    Ownable(MiscEthereum.AAVE_SWAPPER).transferOwnership(address(steward));
 
     vm.stopPrank();
 
@@ -64,7 +60,7 @@ contract PoolExposureStewardTest is Test {
 }
 
 contract Function_depositV3 is PoolExposureStewardTest {
-  function test_revertsIf_notOwnerOrQuardian() public {
+  function test_revertsIf_notOwnerOrGuardian() public {
     vm.startPrank(alice);
 
     vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
@@ -72,7 +68,7 @@ contract Function_depositV3 is PoolExposureStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_zeroAmount() public {
+  function test_revertsIf_zeroAmount() public {
     vm.startPrank(guardian);
 
     vm.expectRevert(CollectorUtils.InvalidZeroAmount.selector);
@@ -92,7 +88,7 @@ contract Function_depositV3 is PoolExposureStewardTest {
 }
 
 contract Function_migrateV2toV3 is PoolExposureStewardTest {
-  function test_revertsIf_notOwnerOrQuardian() public {
+  function test_revertsIf_notOwnerOrGuardian() public {
     vm.startPrank(alice);
 
     vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
@@ -102,7 +98,7 @@ contract Function_migrateV2toV3 is PoolExposureStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_zeroAmount() public {
+  function test_revertsIf_zeroAmount() public {
     vm.startPrank(guardian);
 
     vm.expectRevert(CollectorUtils.InvalidZeroAmount.selector);
@@ -130,6 +126,15 @@ contract Function_migrateV2toV3 is PoolExposureStewardTest {
     );
   }
 
+  function test_revertsIf_arrayLengthMismatch() public {
+    uint256[] memory amounts = new uint256[](1);
+    address[] memory underlyings = new address[](2);
+
+    vm.startPrank(guardian);
+    vm.expectRevert(IPoolExposureSteward.MismatchingArrayLength.selector);
+    steward.migrateV2toV3(address(AaveV2Ethereum.POOL), address(AaveV3Ethereum.POOL), underlyings, amounts);
+  }
+
   function test_success() public {
     uint256 balanceV2Before = IERC20(AaveV2EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR));
     uint256 balanceV3Before = IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR));
@@ -144,10 +149,28 @@ contract Function_migrateV2toV3 is PoolExposureStewardTest {
     assertGt(IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)), balanceV3Before);
     vm.stopPrank();
   }
+
+  function test_success_arrays() public {
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = 1_000e6;
+    address[] memory underlyings = new address[](1);
+    underlyings[0] = AaveV3EthereumAssets.USDC_UNDERLYING;
+
+    uint256 balanceV2Before = IERC20(AaveV2EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+    uint256 balanceV3Before = IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+
+    vm.startPrank(guardian);
+
+    steward.migrateV2toV3(address(AaveV2Ethereum.POOL), address(AaveV3Ethereum.POOL), underlyings, amounts);
+
+    assertLt(IERC20(AaveV2EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)), balanceV2Before);
+    assertGt(IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)), balanceV3Before);
+    vm.stopPrank();
+  }
 }
 
 contract Function_migrateBetweenV3 is PoolExposureStewardTest {
-  function test_revertsIf_notOwnerOrQuardian() public {
+  function test_revertsIf_notOwnerOrGuardian() public {
     vm.startPrank(alice);
 
     vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
@@ -157,7 +180,7 @@ contract Function_migrateBetweenV3 is PoolExposureStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_zeroAmount() public {
+  function test_revertsIf_zeroAmount() public {
     vm.startPrank(guardian);
 
     vm.expectRevert(CollectorUtils.InvalidZeroAmount.selector);
@@ -165,6 +188,15 @@ contract Function_migrateBetweenV3 is PoolExposureStewardTest {
       address(AaveV3Ethereum.POOL), address(AaveV3Ethereum.POOL), AaveV3EthereumAssets.USDC_UNDERLYING, 0
     );
     vm.stopPrank();
+  }
+
+  function test_revertsIf_arrayLengthMismatch() public {
+    uint256[] memory amounts = new uint256[](1);
+    address[] memory underlyings = new address[](2);
+
+    vm.startPrank(guardian);
+    vm.expectRevert(IPoolExposureSteward.MismatchingArrayLength.selector);
+    steward.migrateBetweenV3(address(AaveV3Ethereum.POOL), address(AaveV3EthereumEtherFi.POOL), underlyings, amounts);
   }
 
   function test_success() public {
@@ -187,10 +219,34 @@ contract Function_migrateBetweenV3 is PoolExposureStewardTest {
     );
     vm.stopPrank();
   }
+
+  function test_success_arrays() public {
+    uint256[] memory amounts = new uint256[](1);
+    amounts[0] = 1_000e6;
+    address[] memory underlyings = new address[](1);
+    underlyings[0] = AaveV3EthereumAssets.USDC_UNDERLYING;
+
+    uint256 balanceBefore = IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+    uint256 balanceBeforeEtherFi =
+      IERC20(AaveV3EthereumEtherFiAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+
+    vm.startPrank(guardian);
+
+    steward.migrateBetweenV3(address(AaveV3Ethereum.POOL), address(AaveV3EthereumEtherFi.POOL), underlyings, amounts);
+
+    assertEq(
+      IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)), balanceBefore - 1_000e6
+    );
+    assertEq(
+      IERC20(AaveV3EthereumEtherFiAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)),
+      balanceBeforeEtherFi + 1_000e6
+    );
+    vm.stopPrank();
+  }
 }
 
 contract Function_withdrawV3 is PoolExposureStewardTest {
-  function test_revertsIf_notOwnerOrQuardian() public {
+  function test_revertsIf_notOwnerOrGuardian() public {
     vm.startPrank(alice);
 
     vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
@@ -198,7 +254,7 @@ contract Function_withdrawV3 is PoolExposureStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_zeroAmount() public {
+  function test_revertsIf_zeroAmount() public {
     vm.startPrank(guardian);
 
     vm.expectRevert(CollectorUtils.InvalidZeroAmount.selector);
@@ -218,7 +274,7 @@ contract Function_withdrawV3 is PoolExposureStewardTest {
 }
 
 contract Function_withdrawV2 is PoolExposureStewardTest {
-  function test_revertsIf_notOwnerOrQuardian() public {
+  function test_revertsIf_notOwnerOrGuardian() public {
     vm.startPrank(alice);
 
     vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
@@ -226,7 +282,7 @@ contract Function_withdrawV2 is PoolExposureStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_zeroAmount() public {
+  function test_revertsIf_zeroAmount() public {
     vm.startPrank(guardian);
 
     vm.expectRevert(CollectorUtils.InvalidZeroAmount.selector);
