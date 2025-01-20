@@ -32,6 +32,28 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
   /* EXTERNAL FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
+  function batchLiquidate(address debtAsset, address[] memory collateralAssets, address[] memory users)
+    external
+    override
+  {
+    (uint256 totalDebtAmount,) = getDebtAmount(debtAsset, users);
+
+    IERC20(debtAsset).safeTransferFrom(msg.sender, address(this), totalDebtAmount);
+    IERC20(debtAsset).forceApprove(address(POOL), totalDebtAmount);
+
+    uint256 length = users.length;
+    for (uint256 i = 0; i < length; i++) {
+      POOL.liquidationCall({
+        collateralAsset: collateralAssets[i],
+        debtAsset: debtAsset,
+        user: users[i],
+        debtToCover: type(uint256).max,
+        receiveAToken: true
+      });
+    }
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
   function batchRepayBadDebt(address asset, address[] memory users) external override {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
 
@@ -47,10 +69,30 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
   /* PUBLIC VIEW FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
+  function getDebtAmount(address asset, address[] memory users)
+    public
+    view
+    override
+    returns (uint256, uint256[] memory)
+  {
+    return _getUsersDebtAmounts({asset: asset, users: users, usersCanHaveCollateral: true});
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
   function getBadDebtAmount(address asset, address[] memory users)
     public
     view
     override
+    returns (uint256, uint256[] memory)
+  {
+    return _getUsersDebtAmounts({asset: asset, users: users, usersCanHaveCollateral: false});
+  }
+
+  /* PRIVATE VIEW FUNCTIONS */
+
+  function _getUsersDebtAmounts(address asset, address[] memory users, bool usersCanHaveCollateral)
+    private
+    view
     returns (uint256, uint256[] memory)
   {
     uint256 length = users.length;
@@ -71,7 +113,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
 
       DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
 
-      if (userConfiguration.isUsingAsCollateralAny()) {
+      if (!usersCanHaveCollateral && userConfiguration.isUsingAsCollateralAny()) {
         revert UserHasSomeCollateral(user);
       }
 

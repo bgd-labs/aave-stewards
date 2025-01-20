@@ -21,6 +21,12 @@ interface IBatchRepayBadDebtSteward {
 
   /* EXTERNAL FUNCTIONS */
 
+  /// @notice Liquidates all the users
+  /// @param debtAsset The address of the debt asset
+  /// @param collateralAssets The addresses of the collateral assets that will be liquidated
+  /// @param users The addresses of the users to liquidate
+  function batchLiquidate(address debtAsset, address[] memory collateralAssets, address[] memory users) external;
+
   /// @notice Repays all the bad debt of the users
   /// @dev Will fail if the user has some collateral or no debt
   /// @param asset The address of the asset to repay
@@ -28,6 +34,16 @@ interface IBatchRepayBadDebtSteward {
   function batchRepayBadDebt(address asset, address[] calldata users) external;
 
   /* EXTERNAL VIEW FUNCTIONS */
+
+  /// @notice Returns the total debt amount and the debt amounts of users
+  /// @param asset The address of the asset to repay
+  /// @param users The addresses of the users to repay
+  /// @return totalDebtAmount The total debt amount
+  /// @return debtAmounts The debt amounts of the users
+  function getDebtAmount(address asset, address[] memory users)
+    external
+    view
+    returns (uint256 totalDebtAmount, uint256[] memory debtAmounts);
 
   /// @notice Returns the total bad debt amount and the debt amounts of users
   /// @dev Will fail if the user has some collateral or no debt
