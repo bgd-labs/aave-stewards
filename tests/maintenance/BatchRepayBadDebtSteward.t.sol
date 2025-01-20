@@ -58,10 +58,17 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
 
   address public repayer = address(0x100);
 
+  address public guardian = address(0x101);
+
+  address public owner = address(0x102);
+
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 55793443); // https://snowscan.xyz/block/55793443
 
-    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL));
+    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), guardian, owner);
+
+    assertEq(steward.guardian(), guardian);
+    assertEq(steward.owner(), owner);
 
     vm.label(address(AaveV3Avalanche.POOL), "Pool");
     vm.label(address(steward), "BatchRepayBadDebtSteward");
@@ -72,7 +79,7 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]);
 
-      assertTrue(currentDebtAmount != 0);
+      assertNotEq(currentDebtAmount, 0);
 
       totalBadDebt += currentDebtAmount;
       usersBadDebtAmounts.push(currentDebtAmount);
@@ -81,7 +88,7 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
 
-      assertTrue(currentDebtAmount != 0);
+      assertNotEq(currentDebtAmount, 0);
 
       totalDebtToLiquidate += currentDebtAmount;
       usersEligibleForLiquidationsDebtAmounts.push(currentDebtAmount);
@@ -90,7 +97,7 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
         AaveV3Avalanche.POOL.getReserveData(collateralsEligibleForLiquidations[i]);
       uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
 
-      assertTrue(collateralBalance != 0);
+      assertNotEq(collateralBalance, 0);
     }
   }
 }
@@ -131,6 +138,84 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
       assertTrue(currentDebtAmount <= 1 || collateralBalance <= 1);
     }
+  }
+
+  function test_rescueToken_with_guardian() public {
+    uint256 mintAmount = 1_000_000e18;
+    deal(assetUnderlying, address(steward), mintAmount);
+
+    vm.prank(guardian);
+    steward.rescueToken(assetUnderlying, address(this));
+
+    assertEq(IERC20(assetUnderlying).balanceOf(address(this)), mintAmount);
+    assertEq(IERC20(assetUnderlying).balanceOf(address(steward)), 0);
+  }
+
+  function test_rescueToken_with_owner() public {
+    uint256 mintAmount = 1_000_000e18;
+    deal(assetUnderlying, address(steward), mintAmount);
+
+    vm.prank(owner);
+    steward.rescueToken(assetUnderlying, address(this));
+
+    assertEq(IERC20(assetUnderlying).balanceOf(address(this)), mintAmount);
+    assertEq(IERC20(assetUnderlying).balanceOf(address(steward)), 0);
+  }
+
+  function test_reverts_rescueToken_with_notGuardianOrOwner(address caller) public {
+    vm.assume(caller != guardian && caller != owner);
+
+    uint256 mintAmount = 1_000_000e18;
+    deal(assetUnderlying, address(steward), mintAmount);
+
+    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+
+    vm.prank(caller);
+    steward.rescueToken(assetUnderlying, address(this));
+  }
+
+  receive() external payable {}
+
+  function test_rescueEth_with_guardian() public {
+    uint256 mintAmount = 1_000_000e18;
+    deal(address(steward), mintAmount);
+
+    uint256 addressThisBalanceBefore = address(this).balance;
+
+    vm.prank(guardian);
+    steward.rescueEth(address(this));
+
+    uint256 addressThisBalanceAfter = address(this).balance;
+
+    assertEq(addressThisBalanceAfter - addressThisBalanceBefore, mintAmount);
+    assertEq(address(steward).balance, 0);
+  }
+
+  function test_rescueEth_with_owner() public {
+    uint256 mintAmount = 1_000_000e18;
+    deal(address(steward), mintAmount);
+
+    uint256 addressThisBalanceBefore = address(this).balance;
+
+    vm.prank(owner);
+    steward.rescueEth(address(this));
+
+    uint256 addressThisBalanceAfter = address(this).balance;
+
+    assertEq(addressThisBalanceAfter - addressThisBalanceBefore, mintAmount);
+    assertEq(address(steward).balance, 0);
+  }
+
+  function test_reverts_rescueEth_with_notGuardianOrOwner(address caller) public {
+    vm.assume(caller != guardian && caller != owner);
+
+    uint256 mintAmount = 1_000_000e18;
+    deal(address(steward), mintAmount);
+
+    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+
+    vm.prank(caller);
+    steward.rescueEth(address(this));
   }
 
   function test_getDebtAmount() public view {
@@ -187,5 +272,14 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     );
 
     steward.getBadDebtAmount(assetUnderlying, usersWithGoodDebt);
+  }
+
+  function test_maxRescue() public {
+    assertEq(steward.maxRescue(assetUnderlying), 0);
+
+    uint256 mintAmount = 1_000_000e18;
+    deal(assetUnderlying, address(steward), mintAmount);
+
+    assertEq(steward.maxRescue(assetUnderlying), mintAmount);
   }
 }

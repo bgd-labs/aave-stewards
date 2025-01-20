@@ -3,7 +3,10 @@ pragma solidity ^0.8.0;
 
 import {IPool} from "aave-address-book/AaveV3.sol";
 
-interface IBatchRepayBadDebtSteward {
+import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
+import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuableBase.sol";
+
+interface IBatchRepayBadDebtSteward is IRescuableBase, IWithGuardian {
   /* ERRORS */
 
   /// @notice Thrown when a user has some collateral

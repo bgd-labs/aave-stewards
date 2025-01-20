@@ -8,13 +8,19 @@ import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/con
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
 
+import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuableBase.sol";
+import {RescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
+
+import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
+import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
+
 import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.sol";
 
 /// @title BatchRepayBadDebtSteward
 /// @author BGD Labs
 /// @notice This contract allows to repay all the bad debt of a list of users
 /// @dev Only allowed those users that have some debt and doesn't have any collateral
-contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
+contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, OwnableWithGuardian {
   using SafeERC20 for IERC20;
   using UserConfiguration for DataTypes.UserConfigurationMap;
 
@@ -25,8 +31,16 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
 
   /* CONSTRUCTOR */
 
-  constructor(address _pool) {
+  constructor(address _pool, address _guardian, address _owner) {
     POOL = IPool(_pool);
+
+    if (msg.sender != _guardian) {
+      _updateGuardian(_guardian);
+    }
+
+    if (msg.sender != _owner) {
+      _transferOwnership(_owner);
+    }
   }
 
   /* EXTERNAL FUNCTIONS */
@@ -66,6 +80,14 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
     }
   }
 
+  function rescueToken(address token, address to) external onlyOwnerOrGuardian {
+    _emergencyTokenTransfer(token, to, type(uint256).max);
+  }
+
+  function rescueEth(address to) external onlyOwnerOrGuardian {
+    _emergencyEtherTransfer(to, address(this).balance);
+  }
+
   /* PUBLIC VIEW FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
@@ -86,6 +108,11 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward {
     returns (uint256, uint256[] memory)
   {
     return _getUsersDebtAmounts({asset: asset, users: users, usersCanHaveCollateral: false});
+  }
+
+  /// @inheritdoc IRescuableBase
+  function maxRescue(address erc20Token) public view virtual override(IRescuableBase, RescuableBase) returns (uint256) {
+    return IERC20(erc20Token).balanceOf(address(this));
   }
 
   /* PRIVATE VIEW FUNCTIONS */
