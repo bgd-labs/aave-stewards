@@ -7,6 +7,8 @@ import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
 import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 
+import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
+
 import {IBatchRepayBadDebtSteward} from "../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol";
 import {BatchRepayBadDebtSteward} from "../../src/maintenance/BatchRepayBadDebtSteward.sol";
 
@@ -56,23 +58,28 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
     0x97F0d7f9d9e7Fe4BFBAbc04BE336dc058873A0E8
   ];
 
-  address public repayer = address(0x100);
-
   address public guardian = address(0x101);
 
   address public owner = address(0x102);
 
+  address public collector = address(AaveV3Avalanche.COLLECTOR);
+
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 55793443); // https://snowscan.xyz/block/55793443
 
-    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), guardian, owner);
+    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), guardian, owner, collector);
 
     assertEq(steward.guardian(), guardian);
     assertEq(steward.owner(), owner);
 
+    vm.prank(collector);
+    IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
+
     vm.label(address(AaveV3Avalanche.POOL), "Pool");
     vm.label(address(steward), "BatchRepayBadDebtSteward");
-    vm.label(repayer, "Repayer");
+    vm.label(guardian, "Guardian");
+    vm.label(owner, "Owner");
+    vm.label(collector, "Collector");
     vm.label(assetUnderlying, "AssetUnderlying");
     vm.label(assetDebtToken, "AssetDebtToken");
 
@@ -104,30 +111,46 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
 
 contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
   function test_batchRepayBadDebt() public {
-    deal(assetUnderlying, repayer, totalBadDebt);
-    vm.prank(repayer);
-    IERC20(assetUnderlying).approve(address(steward), totalBadDebt);
+    deal(assetUnderlying, collector, totalBadDebt);
 
-    vm.prank(repayer);
+    uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
+
+    vm.prank(guardian);
     steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt);
 
-    assertEq(IERC20(assetUnderlying).balanceOf(repayer), 0);
+    uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
+
+    assertEq(collectorBalanceBefore - collectorBalanceAfter, totalBadDebt);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
     }
   }
 
+  function test_reverts_batchRepayBadDebt_caller_not_cleaner(address caller) public {
+    vm.assume(caller != guardian);
+
+    vm.expectRevert(
+      abi.encodePacked(
+        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.CLEANUP()
+      )
+    );
+
+    vm.prank(caller);
+    steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt);
+  }
+
   function test_batchLiquidate() public {
-    deal(assetUnderlying, repayer, totalDebtToLiquidate);
+    deal(assetUnderlying, collector, totalDebtToLiquidate);
 
-    vm.prank(repayer);
-    IERC20(assetUnderlying).approve(address(steward), totalDebtToLiquidate);
+    uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
 
-    vm.prank(repayer);
+    vm.prank(guardian);
     steward.batchLiquidate(assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations);
 
-    assertEq(IERC20(assetUnderlying).balanceOf(repayer), 0);
+    uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
+
+    assertEq(collectorBalanceBefore - collectorBalanceAfter, totalDebtToLiquidate);
 
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
@@ -138,6 +161,19 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
       assertTrue(currentDebtAmount <= 1 || collateralBalance <= 1);
     }
+  }
+
+  function test_reverts_batchLiquidate_caller_not_cleaner(address caller) public {
+    vm.assume(caller != guardian);
+
+    vm.expectRevert(
+      abi.encodePacked(
+        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.CLEANUP()
+      )
+    );
+
+    vm.prank(caller);
+    steward.batchLiquidate(assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations);
   }
 
   function test_rescueToken_with_guardian() public {

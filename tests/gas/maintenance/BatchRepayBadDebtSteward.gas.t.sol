@@ -206,15 +206,10 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     }
 
     uint256 mintAmount = 1_000_000e18;
-    deal(assetUnderlying, repayer, mintAmount);
+    deal(assetUnderlying, collector, mintAmount);
 
-    vm.startPrank(repayer);
-
-    IERC20(assetUnderlying).approve(address(steward), mintAmount);
-
+    vm.prank(guardian);
     steward.batchRepayBadDebt(assetUnderlying, users);
-
-    vm.stopPrank();
   }
 
   function _callBatchLiquidateWithNumberOfUsers(uint256 userAmount) private {
@@ -224,14 +219,9 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     }
 
     uint256 mintAmount = 1_000_000e18;
-    deal(assetUnderlying, repayer, mintAmount);
+    deal(assetUnderlying, collector, mintAmount);
 
-    vm.startPrank(repayer);
-
-    IERC20(assetUnderlying).approve(address(steward), mintAmount);
-
+    vm.prank(guardian);
     steward.batchLiquidate(assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations);
-
-    vm.stopPrank();
   }
 }

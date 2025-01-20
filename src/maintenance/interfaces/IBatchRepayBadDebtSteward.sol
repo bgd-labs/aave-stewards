@@ -6,7 +6,9 @@ import {IPool} from "aave-address-book/AaveV3.sol";
 import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
 import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuableBase.sol";
 
-interface IBatchRepayBadDebtSteward is IRescuableBase, IWithGuardian {
+import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
+
+interface IBatchRepayBadDebtSteward is IRescuableBase, IWithGuardian, IAccessControl {
   /* ERRORS */
 
   /// @notice Thrown when a user has some collateral
@@ -17,10 +19,18 @@ interface IBatchRepayBadDebtSteward is IRescuableBase, IWithGuardian {
   /// @param user The address of the user
   error UsersShouldBeDifferent(address user);
 
+  error ZeroAddress();
+
   /* GLOBAL VARIABLES */
+
+  /// @notice The role that allows to call the `batchLiquidate` and `batchRepayBadDebt` functions
+  function CLEANUP() external view returns (bytes32);
 
   /// @notice The Aave pool
   function POOL() external view returns (IPool);
+
+  /// @notice The Aave collector
+  function collector() external view returns (address);
 
   /* EXTERNAL FUNCTIONS */
 
