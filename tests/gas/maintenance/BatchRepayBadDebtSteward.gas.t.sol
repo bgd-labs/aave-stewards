@@ -181,6 +181,48 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 6 users");
   }
 
+  function test_batchLiquidateWithMaxCap_zero_users() public {
+    _callBatchLiquidateWithMaxCapWithNumberOfUsers(0);
+
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 0 users");
+  }
+
+  function test_batchLiquidateWithMaxCap_one_user() public {
+    _callBatchLiquidateWithMaxCapWithNumberOfUsers(1);
+
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 1 user");
+  }
+
+  function test_batchLiquidateWithMaxCap_two_users() public {
+    _callBatchLiquidateWithMaxCapWithNumberOfUsers(2);
+
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 2 users");
+  }
+
+  function test_batchLiquidateWithMaxCap_three_users() public {
+    _callBatchLiquidateWithMaxCapWithNumberOfUsers(3);
+
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 3 users");
+  }
+
+  function test_batchLiquidateWithMaxCap_four_users() public {
+    _callBatchLiquidateWithMaxCapWithNumberOfUsers(4);
+
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 4 users");
+  }
+
+  function test_batchLiquidateWithMaxCap_five_users() public {
+    _callBatchLiquidateWithMaxCapWithNumberOfUsers(5);
+
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 5 users");
+  }
+
+  function test_batchLiquidateWithMaxCap_six_users() public {
+    _callBatchLiquidateWithMaxCapWithNumberOfUsers(6);
+
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 6 users");
+  }
+
   function _callGetBadDebtAmountWithNumberOfUsers(uint256 userAmount) private view {
     address[] memory users = new address[](userAmount);
     for (uint256 i = 0; i < userAmount; ++i) {
@@ -214,14 +256,31 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
   function _callBatchLiquidateWithNumberOfUsers(uint256 userAmount) private {
     address[] memory users = new address[](userAmount);
+    address[] memory collaterals = new address[](userAmount);
     for (uint256 i = 0; i < userAmount; ++i) {
       users[i] = usersEligibleForLiquidations[i];
+      collaterals[i] = collateralsEligibleForLiquidations[i];
     }
 
     uint256 mintAmount = 1_000_000e18;
     deal(assetUnderlying, collector, mintAmount);
 
     vm.prank(guardian);
-    steward.batchLiquidate(assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations);
+    steward.batchLiquidate(assetUnderlying, collaterals, users);
+  }
+
+  function _callBatchLiquidateWithMaxCapWithNumberOfUsers(uint256 userAmount) private {
+    address[] memory users = new address[](userAmount);
+    address[] memory collaterals = new address[](userAmount);
+    for (uint256 i = 0; i < userAmount; ++i) {
+      users[i] = usersEligibleForLiquidations[i];
+      collaterals[i] = collateralsEligibleForLiquidations[i];
+    }
+
+    uint256 mintAmount = 1_000_000e18;
+    deal(assetUnderlying, collector, mintAmount);
+
+    vm.prank(guardian);
+    steward.batchLiquidateWithMaxCap(assetUnderlying, totalDebtToLiquidate, collaterals, users);
   }
 }
