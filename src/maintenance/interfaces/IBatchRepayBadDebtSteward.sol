@@ -30,7 +30,7 @@ interface IBatchRepayBadDebtSteward is IRescuableBase, IWithGuardian, IAccessCon
   function POOL() external view returns (IPool);
 
   /// @notice The Aave collector
-  function collector() external view returns (address);
+  function COLLECTOR() external view returns (address);
 
   /* EXTERNAL FUNCTIONS */
 

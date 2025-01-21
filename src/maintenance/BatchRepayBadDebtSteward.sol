@@ -37,7 +37,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
   IPool public immutable override POOL;
 
   /// @inheritdoc IBatchRepayBadDebtSteward
-  address public immutable override collector;
+  address public immutable override COLLECTOR;
 
   /* CONSTRUCTOR */
 
@@ -47,7 +47,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
     }
 
     POOL = IPool(_pool);
-    collector = _collector;
+    COLLECTOR = _collector;
 
     if (msg.sender != _guardian) {
       _updateGuardian(_guardian);
@@ -71,7 +71,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
   {
     (uint256 totalDebtAmount,) = getDebtAmount(debtAsset, users);
 
-    IERC20(debtAsset).safeTransferFrom(collector, address(this), totalDebtAmount);
+    IERC20(debtAsset).safeTransferFrom(COLLECTOR, address(this), totalDebtAmount);
     IERC20(debtAsset).forceApprove(address(POOL), totalDebtAmount);
 
     uint256 length = users.length;
@@ -90,7 +90,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
   function batchRepayBadDebt(address asset, address[] memory users) external override onlyRole(CLEANUP) {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
 
-    IERC20(asset).safeTransferFrom(collector, address(this), totalDebtAmount);
+    IERC20(asset).safeTransferFrom(COLLECTOR, address(this), totalDebtAmount);
     IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
 
     uint256 length = users.length;
