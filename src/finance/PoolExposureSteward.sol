@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
+import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
+import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
+import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
+
 import {IPoolExposureSteward} from "./interfaces/IPoolExposureSteward.sol";
 
 /**
@@ -25,7 +28,7 @@ import {IPoolExposureSteward} from "./interfaces/IPoolExposureSteward.sol";
  * While the permitted Service Provider will have full control over the funds, the allowed actions are limited by the contract itself.
  * All token interactions start and end on the Collector, so no funds ever leave the DAO possession at any point in time.
  */
-contract PoolExposureSteward is OwnableWithGuardian, IPoolExposureSteward {
+contract PoolExposureSteward is OwnableWithGuardian, Rescuable, IPoolExposureSteward {
   using CU for ICollector;
   using CU for CU.IOInput;
 
@@ -151,6 +154,16 @@ contract PoolExposureSteward is OwnableWithGuardian, IPoolExposureSteward {
   /// @inheritdoc IPoolExposureSteward
   function revokePool(address pool, bool isVersion3) external onlyOwner {
     _revokePool(pool, isVersion3);
+  }
+
+  /// @inheritdoc Rescuable
+  function whoCanRescue() public view override returns (address) {
+    return owner();
+  }
+
+  /// @inheritdoc IRescuableBase
+  function maxRescue(address) public pure override(RescuableBase, IRescuableBase) returns (uint256) {
+    return type(uint256).max;
   }
 
   /// Logic

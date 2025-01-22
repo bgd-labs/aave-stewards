@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 import {Ownable} from "solidity-utils/contracts/oz-common/Ownable.sol";
+import {IRescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {GovernanceV3Ethereum} from "aave-address-book/GovernanceV3Ethereum.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
 import {AaveV3EthereumLido} from "aave-address-book/AaveV3EthereumLido.sol";
@@ -362,5 +363,35 @@ contract Function_revokePool is PoolExposureStewardTest {
     emit RevokedV2Pool(address(AaveV2Ethereum.POOL));
     steward.revokePool(address(AaveV2Ethereum.POOL), false);
     vm.stopPrank();
+  }
+}
+
+contract Function_emergencyTokenTransfer is PoolExposureStewardTest {
+  function test_revertsIf_invalidCaller() public {
+    vm.expectRevert(IRescuable.OnlyRescueGuardian.selector);
+    steward.emergencyTokenTransfer(AaveV2EthereumAssets.BAL_UNDERLYING, address(AaveV2Ethereum.COLLECTOR), 1_000e6);
+  }
+
+  function test_successful_governanceCaller() public {
+    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), 0);
+
+    uint256 aaveAmount = 1_000e18;
+
+    deal(AaveV2EthereumAssets.AAVE_UNDERLYING, address(steward), aaveAmount);
+
+    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), aaveAmount);
+
+    uint256 initialCollectorUsdcBalance =
+      IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR));
+
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    steward.emergencyTokenTransfer(AaveV2EthereumAssets.AAVE_UNDERLYING, address(AaveV2Ethereum.COLLECTOR), aaveAmount);
+    vm.stopPrank();
+
+    assertEq(
+      IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR)),
+      initialCollectorUsdcBalance + aaveAmount
+    );
+    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), 0);
   }
 }
