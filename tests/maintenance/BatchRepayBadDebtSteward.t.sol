@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 
+import {GovV3Helpers} from "aave-helpers/src/GovV3Helpers.sol";
+
 import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
 import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
 
@@ -65,8 +67,8 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
   address public collector = address(AaveV3Avalanche.COLLECTOR);
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("avalanche"), 55793443); // https://snowscan.xyz/block/55793443
-
+    vm.createSelectFork(vm.rpcUrl("avalanche"), 56542577); // https://snowscan.xyz/block/55793443
+    GovV3Helpers.executePayload(vm, 64);
     steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), guardian, owner, collector);
 
     assertEq(steward.guardian(), guardian);
