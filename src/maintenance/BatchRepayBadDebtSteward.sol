@@ -4,19 +4,18 @@ pragma solidity ^0.8.0;
 import {IPool, DataTypes} from "aave-address-book/AaveV3.sol";
 
 import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
-
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
-import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
+import {ICollector, IERC20 as IERC20Col} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 
 import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuableBase.sol";
 import {RescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
 import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
-import {Context as OzCommonContext} from "solidity-utils/contracts/oz-common/Context.sol";
 
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
-import {Context as OzContext} from "openzeppelin-contracts/contracts/utils/Context.sol";
+import {Context} from "openzeppelin-contracts/contracts/utils/Context.sol";
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.sol";
 
@@ -41,7 +40,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
 
   /* CONSTRUCTOR */
 
-  constructor(address _pool, address _guardian, address _owner, address _collector) {
+  constructor(address _pool, address _guardian, address _owner, address _collector) OwnableWithGuardian(_owner) {
     if (_pool == address(0) || _guardian == address(0) || _owner == address(0) || _collector == address(0)) {
       revert ZeroAddress();
     }
@@ -80,9 +79,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
     address[] memory collateralAssets,
     address[] memory users
   ) public override onlyRole(CLEANUP) {
-    uint256 balanceBefore = IERC20(debtAsset).balanceOf(address(this));
-
-    IERC20(debtAsset).safeTransferFrom(COLLECTOR, address(this), debtTokenAmount);
+    ICollector(COLLECTOR).transfer(IERC20Col(debtAsset), address(this), debtTokenAmount);
     IERC20(debtAsset).forceApprove(address(POOL), debtTokenAmount);
 
     uint256 length = users.length;
@@ -98,8 +95,8 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
 
     uint256 balanceAfter = IERC20(debtAsset).balanceOf(address(this));
 
-    if (balanceAfter > balanceBefore) {
-      IERC20(debtAsset).safeTransfer(COLLECTOR, balanceAfter - balanceBefore);
+    if (balanceAfter != 0) {
+      IERC20(debtAsset).safeTransfer(COLLECTOR, balanceAfter);
     }
   }
 
@@ -107,7 +104,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
   function batchRepayBadDebt(address asset, address[] memory users) external override onlyRole(CLEANUP) {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
 
-    IERC20(asset).safeTransferFrom(COLLECTOR, address(this), totalDebtAmount);
+    ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), totalDebtAmount);
     IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
 
     uint256 length = users.length;
@@ -155,13 +152,13 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
 
   /* INTERNAL FUNCTIONS */
 
-  function _msgSender() internal view override(OzCommonContext, OzContext) returns (address) {
-    return msg.sender;
-  }
+  // function _msgSender() internal view override(Context) returns (address) {
+  //   return msg.sender;
+  // }
 
-  function _msgData() internal pure override(OzCommonContext, OzContext) returns (bytes calldata) {
-    return msg.data;
-  }
+  // function _msgData() internal pure override(Context) returns (bytes calldata) {
+  //   return msg.data;
+  // }
 
   /* PRIVATE VIEW FUNCTIONS */
 
