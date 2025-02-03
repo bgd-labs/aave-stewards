@@ -67,9 +67,13 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
   address public collector = address(AaveV3Avalanche.COLLECTOR);
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("avalanche"), 56542577); // https://snowscan.xyz/block/55793443
-    GovV3Helpers.executePayload(vm, 64);
+    vm.createSelectFork(vm.rpcUrl("avalanche"), 56768474); // https://snowscan.xyz/block/56768474
     steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), guardian, owner, collector);
+
+    // execute pending proposal
+    GovV3Helpers.executePayload(vm, 65);
+    vm.prank(AaveV3Avalanche.ACL_ADMIN);
+    IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
 
     assertEq(steward.guardian(), guardian);
     assertEq(steward.owner(), owner);
@@ -198,7 +202,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
         AaveV3Avalanche.POOL.getReserveData(collateralsEligibleForLiquidations[i]);
       uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
 
-      assertTrue(currentDebtAmount <= 1 || collateralBalance <= 1);
+      assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
     }
   }
 

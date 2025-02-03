@@ -2,6 +2,3 @@
 	path = lib/aave-helpers
 	url = https://github.com/bgd-labs/aave-helpers
 	branch = fix/upgrade-to-new-utils
-[submodule "lib/aave-v3-origin"]
-	path = lib/aave-v3-origin
-	url = https://github.com/aave-dao/aave-v3-origin

@@ -1,14 +1,7 @@
 {
-  "function getBadDebtAmount: with 0 users": "40618",
-  "function getBadDebtAmount: with 1 user": "61262",
-  "function getBadDebtAmount: with 2 users": "73018",
-  "function getBadDebtAmount: with 4 users": "96984",
-  "function getBadDebtAmount: with 5 users": "109193",
-  "function getBadDebtAmount: with 6 users": "121554",
-  "function getDebtAmount: with 0 users": "40685",
-  "function getDebtAmount: with 1 user": "61309",
-  "function getDebtAmount: with 2 users": "73018",
-  "function getDebtAmount: with 4 users": "96971",
-  "function getDebtAmount: with 5 users": "109160",
-  "function getDebtAmount: with 6 users": "121501"
+  "function batchLiquidateWithMaxCap: with 0 users": "78251",
+  "function batchLiquidateWithMaxCap: with 1 user": "588291",
+  "function batchLiquidateWithMaxCap: with 2 users": "866746",
+  "function batchLiquidateWithMaxCap: with 3 users": "1140018",
+  "function batchLiquidateWithMaxCap: with 4 users": "1461776"
 }

@@ -1,10 +1,10 @@
 aave-address-book/=lib/aave-helpers/lib/aave-address-book/src/
 aave-helpers/=lib/aave-helpers/
-aave-v3-origin-tests/=lib/aave-v3-origin/tests/
-aave-v3-origin/=lib/aave-v3-origin/src
+aave-v3-origin-tests/=lib/aave-helpers/lib/aave-address-book/lib/aave-v3-origin/tests/
+aave-v3-origin/=lib/aave-helpers/lib/aave-address-book/lib/aave-v3-origin/src
 ds-test/=lib/aave-helpers/lib/solidity-utils/lib/openzeppelin-contracts-upgradeable/lib/forge-std/lib/ds-test/src/
 erc4626-tests/=lib/aave-helpers/lib/solidity-utils/lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/
 forge-std/=lib/aave-helpers/lib/aave-address-book/lib/aave-v3-origin/lib/forge-std/src/
-openzeppelin-contracts-upgradeable/=lib/aave-v3-origin/lib/solidity-utils/lib/openzeppelin-contracts-upgradeable/
-openzeppelin-contracts/=lib/aave-v3-origin/lib/solidity-utils/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/
-solidity-utils/=lib/aave-v3-origin/lib/solidity-utils/src/
+openzeppelin-contracts-upgradeable/=lib/aave-helpers/lib/aave-address-book/lib/aave-v3-origin/lib/solidity-utils/lib/openzeppelin-contracts-upgradeable/
+openzeppelin-contracts/=lib/aave-helpers/lib/aave-address-book/lib/aave-v3-origin/lib/solidity-utils/lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/
+solidity-utils/=lib/aave-helpers/lib/aave-address-book/lib/aave-v3-origin/lib/solidity-utils/src/
