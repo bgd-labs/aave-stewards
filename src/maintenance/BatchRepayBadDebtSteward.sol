@@ -20,10 +20,12 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.sol";
 
-/// @title BatchRepayBadDebtSteward
-/// @author BGD Labs
-/// @notice This contract allows to repay all the bad debt of a list of users
-/// @dev Only allowed those users that have some debt and doesn't have any collateral
+/**
+ * @title BatchRepayBadDebtSteward
+ * @author BGD Labs
+ * @notice This contract allows to repay all the bad debt of a list of users
+ * @dev Only allowed those users that have some debt and doesn't have any collateral
+ */
 contract BatchRepayBadDebtSteward is
   IBatchRepayBadDebtSteward,
   RescuableBase,
@@ -47,21 +49,15 @@ contract BatchRepayBadDebtSteward is
 
   /* CONSTRUCTOR */
 
-  constructor(address _pool, address _guardian, address _owner, address _collector) OwnableWithGuardian(_owner) {
-    if (_pool == address(0) || _guardian == address(0) || _owner == address(0) || _collector == address(0)) {
+  constructor(address _pool, address _guardian, address _owner, address _collector)
+    OwnableWithGuardian(_owner, _guardian)
+  {
+    if (_pool == address(0) || _collector == address(0)) {
       revert ZeroAddress();
     }
 
     POOL = IPool(_pool);
     COLLECTOR = _collector;
-
-    if (msg.sender != _guardian) {
-      _updateGuardian(_guardian);
-    }
-
-    if (msg.sender != _owner) {
-      _transferOwnership(_owner);
-    }
 
     _grantRole(DEFAULT_ADMIN_ROLE, _owner);
     _grantRole(CLEANUP, _guardian);

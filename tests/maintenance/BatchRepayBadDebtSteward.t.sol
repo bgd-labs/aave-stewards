@@ -37,7 +37,7 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
     0x07d89372dAa468575b7fbd814E4A9D59e38d414b,
     0x741BeB5C2D744f8aCc8f54fbACa1880911D2cB32,
     0x6821Aceb02Bd2a64d0900cBf193A543aB41d397e,
-    0x04249B0B26eA4a91F4F36d95c6CD11a207e22768,
+    0x5822fb7f7eC70258abe638a6E8637FEd206311F7,
     0x35cBb2525e442488Ed51cE524b4000D4d0d01acC
   ];
   address[] public collateralsEligibleForLiquidations = [
@@ -146,7 +146,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt);
   }
 
-  function test_batchLiquidate() public {
+  function test_batchLiquidate_repor() public {
     deal(assetUnderlying, collector, totalDebtToLiquidate);
 
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
