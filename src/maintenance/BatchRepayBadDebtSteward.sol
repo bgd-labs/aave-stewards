@@ -13,7 +13,8 @@ import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
-import {Context} from "openzeppelin-contracts/contracts/utils/Context.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
+
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
@@ -23,7 +24,13 @@ import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.
 /// @author BGD Labs
 /// @notice This contract allows to repay all the bad debt of a list of users
 /// @dev Only allowed those users that have some debt and doesn't have any collateral
-contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, OwnableWithGuardian, AccessControl {
+contract BatchRepayBadDebtSteward is
+  IBatchRepayBadDebtSteward,
+  RescuableBase,
+  OwnableWithGuardian,
+  Multicall,
+  AccessControl
+{
   using SafeERC20 for IERC20;
   using UserConfiguration for DataTypes.UserConfigurationMap;
 
