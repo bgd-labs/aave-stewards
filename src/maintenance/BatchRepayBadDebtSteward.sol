@@ -150,16 +150,6 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
     return IERC20(erc20Token).balanceOf(address(this));
   }
 
-  /* INTERNAL FUNCTIONS */
-
-  // function _msgSender() internal view override(Context) returns (address) {
-  //   return msg.sender;
-  // }
-
-  // function _msgData() internal pure override(Context) returns (bytes calldata) {
-  //   return msg.data;
-  // }
-
   /* PRIVATE VIEW FUNCTIONS */
 
   function _getUsersDebtAmounts(address asset, address[] memory users, bool usersCanHaveCollateral)
