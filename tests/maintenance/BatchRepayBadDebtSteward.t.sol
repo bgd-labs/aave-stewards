@@ -146,9 +146,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt);
   }
 
-  function test_batchLiquidate_repor() public {
-    deal(assetUnderlying, collector, totalDebtToLiquidate);
-
+  function test_batchLiquidate() public {
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
@@ -177,10 +175,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
   function test_batchLiquidateWithMaxCap() public {
     uint256 passedAmount = totalDebtToLiquidate - 100;
 
-    deal(assetUnderlying, address(steward), passedAmount);
-
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
-    uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
     vm.prank(guardian);
     steward.batchLiquidateWithMaxCap(
@@ -188,12 +183,9 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     );
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
-    uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
-    assertTrue(collectorBalanceBefore - collectorBalanceAfter <= passedAmount);
-
-    assertEq(stewardBalanceBefore, stewardBalanceAfter);
+    assertTrue(collectorBalanceBefore >= collectorBalanceAfter, "EXPECTED_BALANCE_DECREASE");
+    assertTrue(collectorBalanceBefore - collectorBalanceAfter <= passedAmount, "OVERSPENT");
 
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);

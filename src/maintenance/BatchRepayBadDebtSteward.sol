@@ -96,8 +96,8 @@ contract BatchRepayBadDebtSteward is
       });
     }
 
+    // transfer back surplus
     uint256 balanceAfter = IERC20(debtAsset).balanceOf(address(this));
-
     if (balanceAfter != 0) {
       IERC20(debtAsset).safeTransfer(COLLECTOR, balanceAfter);
     }
