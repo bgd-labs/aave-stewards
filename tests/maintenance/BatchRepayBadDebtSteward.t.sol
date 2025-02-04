@@ -179,7 +179,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     vm.prank(guardian);
     steward.batchLiquidateWithMaxCap(
-      assetUnderlying, passedAmount, collateralsEligibleForLiquidations, usersEligibleForLiquidations
+      assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations, passedAmount
     );
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
@@ -222,7 +222,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     vm.prank(caller);
     steward.batchLiquidateWithMaxCap(
-      assetUnderlying, 1, collateralsEligibleForLiquidations, usersEligibleForLiquidations
+      assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations, 1
     );
   }
 

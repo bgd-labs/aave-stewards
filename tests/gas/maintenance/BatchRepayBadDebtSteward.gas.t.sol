@@ -281,6 +281,6 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     deal(assetUnderlying, collector, mintAmount);
 
     vm.prank(guardian);
-    steward.batchLiquidateWithMaxCap(assetUnderlying, totalDebtToLiquidate, collaterals, users);
+    steward.batchLiquidateWithMaxCap(assetUnderlying, collaterals, users, totalDebtToLiquidate);
   }
 }

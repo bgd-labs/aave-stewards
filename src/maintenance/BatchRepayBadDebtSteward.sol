@@ -72,18 +72,18 @@ contract BatchRepayBadDebtSteward is
   {
     (uint256 totalDebtAmount,) = getDebtAmount(debtAsset, users);
 
-    batchLiquidateWithMaxCap(debtAsset, totalDebtAmount, collateralAssets, users);
+    batchLiquidateWithMaxCap(debtAsset, collateralAssets, users, totalDebtAmount);
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
   function batchLiquidateWithMaxCap(
     address debtAsset,
-    uint256 debtTokenAmount,
     address[] memory collateralAssets,
-    address[] memory users
+    address[] memory users,
+    uint256 maxDebtTokenAmount
   ) public override onlyRole(CLEANUP) {
-    ICollector(COLLECTOR).transfer(IERC20Col(debtAsset), address(this), debtTokenAmount);
-    IERC20(debtAsset).forceApprove(address(POOL), debtTokenAmount);
+    ICollector(COLLECTOR).transfer(IERC20Col(debtAsset), address(this), maxDebtTokenAmount);
+    IERC20(debtAsset).forceApprove(address(POOL), maxDebtTokenAmount);
 
     uint256 length = users.length;
     for (uint256 i = 0; i < length; i++) {
