@@ -165,7 +165,7 @@ contract BatchRepayBadDebtSteward is
     uint256 totalDebtAmount;
     uint256[] memory debtAmounts = new uint256[](length);
 
-    DataTypes.ReserveDataLegacy memory reserveData = POOL.getReserveData(asset);
+    address variableDebtTokenAddress = POOL.getReserveVariableDebtToken(asset);
 
     for (uint256 i = 0; i < length; i++) {
       address user = users[i];
@@ -182,7 +182,7 @@ contract BatchRepayBadDebtSteward is
         revert UserHasSomeCollateral(user);
       }
 
-      totalDebtAmount += debtAmounts[i] = IERC20(reserveData.variableDebtTokenAddress).balanceOf(user);
+      totalDebtAmount += debtAmounts[i] = IERC20(variableDebtTokenAddress).balanceOf(user);
     }
 
     return (totalDebtAmount, debtAmounts);
