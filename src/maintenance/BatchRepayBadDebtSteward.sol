@@ -173,10 +173,12 @@ contract BatchRepayBadDebtSteward is
     address user;
     for (uint256 i = 0; i < length; i++) {
       user = users[i];
-      DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
 
-      if (!usersCanHaveCollateral && userConfiguration.isUsingAsCollateralAny()) {
-        revert UserHasSomeCollateral(user);
+      if (!usersCanHaveCollateral) {
+        DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
+        if (userConfiguration.isUsingAsCollateralAny()) {
+          revert UserHasSomeCollateral(user);
+        }
       }
 
       totalDebtAmount += debtAmounts[i] = IERC20(variableDebtTokenAddress).balanceOf(user);
