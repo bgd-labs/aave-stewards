@@ -36,19 +36,19 @@ interface IBatchRepayBadDebtSteward is IRescuableBase, IWithGuardian, IAccessCon
 
   /// @notice Liquidates all the users
   /// @param debtAsset The address of the debt asset
-  /// @param collateralAssets The addresses of the collateral assets that will be liquidated
+  /// @param collateralAsset The address of the collateral asset that will be liquidated
   /// @param users The addresses of the users to liquidate
-  function batchLiquidate(address debtAsset, address[] memory collateralAssets, address[] memory users) external;
+  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users) external;
 
   /// @notice Liquidates all the users with a max debt amount to be liquidated
   /// @param debtAsset The address of the debt asset
-  /// @param collateralAssets The addresses of the collateral assets that will be liquidated
+  /// @param collateralAsset The address of the collateral asset that will be liquidated
   /// @param users The addresses of the users to liquidate
   /// @param maxDebtTokenAmount The maximum amount of debt tokens to be liquidated
   /// @dev this is the amount being pulled from the collector. The contract will send the surplus back to the collector.
   function batchLiquidateWithMaxCap(
     address debtAsset,
-    address[] memory collateralAssets,
+    address collateralAsset,
     address[] memory users,
     uint256 maxDebtTokenAmount
   ) external;

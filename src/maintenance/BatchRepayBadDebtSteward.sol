@@ -66,29 +66,25 @@ contract BatchRepayBadDebtSteward is
   /* EXTERNAL FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
-  function batchLiquidate(address debtAsset, address[] memory collateralAssets, address[] memory users)
-    external
-    override
-  {
-    (uint256 totalDebtAmount,) = getDebtAmount(debtAsset, users);
+  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users) external override {
+    (uint256 maxDebtAmount,) = getDebtAmount(debtAsset, users);
 
-    batchLiquidateWithMaxCap(debtAsset, collateralAssets, users, totalDebtAmount);
+    batchLiquidateWithMaxCap(debtAsset, collateralAsset, users, maxDebtAmount);
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
   function batchLiquidateWithMaxCap(
     address debtAsset,
-    address[] memory collateralAssets,
+    address collateralAsset,
     address[] memory users,
     uint256 maxDebtTokenAmount
   ) public override onlyRole(CLEANUP) {
     ICollector(COLLECTOR).transfer(IERC20Col(debtAsset), address(this), maxDebtTokenAmount);
     IERC20(debtAsset).forceApprove(address(POOL), maxDebtTokenAmount);
 
-    uint256 length = users.length;
-    for (uint256 i = 0; i < length; i++) {
+    for (uint256 i = 0; i < users.length; i++) {
       POOL.liquidationCall({
-        collateralAsset: collateralAssets[i],
+        collateralAsset: collateralAsset,
         debtAsset: debtAsset,
         user: users[i],
         debtToCover: type(uint256).max,
@@ -101,6 +97,9 @@ contract BatchRepayBadDebtSteward is
     if (balanceAfter != 0) {
       IERC20(debtAsset).safeTransfer(COLLECTOR, balanceAfter);
     }
+
+    // transfer back liquidated assets
+    IERC20(POOL.getReserveAToken(collateralAsset)).safeTransfer(COLLECTOR, type(uint256).max);
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
@@ -110,8 +109,7 @@ contract BatchRepayBadDebtSteward is
     ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), totalDebtAmount);
     IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
 
-    uint256 length = users.length;
-    for (uint256 i = 0; i < length; i++) {
+    for (uint256 i = 0; i < users.length; i++) {
       POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
     }
 
