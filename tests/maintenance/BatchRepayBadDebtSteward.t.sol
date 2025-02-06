@@ -319,10 +319,6 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     passedArray[0] = usersWithBadDebt[0];
     passedArray[1] = usersWithBadDebt[0];
 
-    vm.expectRevert(
-      abi.encodePacked(IBatchRepayBadDebtSteward.UsersShouldBeDifferent.selector, uint256(uint160(passedArray[0])))
-    );
-
     steward.getDebtAmount(assetUnderlying, passedArray);
   }
 
@@ -330,10 +326,6 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     address[] memory passedArray = new address[](2);
     passedArray[0] = usersWithBadDebt[0];
     passedArray[1] = usersWithBadDebt[0];
-
-    vm.expectRevert(
-      abi.encodePacked(IBatchRepayBadDebtSteward.UsersShouldBeDifferent.selector, uint256(uint160(passedArray[0])))
-    );
 
     steward.getBadDebtAmount(assetUnderlying, passedArray);
   }

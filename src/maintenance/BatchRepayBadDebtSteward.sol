@@ -114,6 +114,9 @@ contract BatchRepayBadDebtSteward is
     for (uint256 i = 0; i < length; i++) {
       POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
     }
+
+    uint256 balanceLeft = IERC20(asset).balanceOf(address(this));
+    if (balanceLeft != 0) IERC20(asset).transfer(COLLECTOR, balanceLeft);
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
@@ -167,15 +170,9 @@ contract BatchRepayBadDebtSteward is
 
     address variableDebtTokenAddress = POOL.getReserveVariableDebtToken(asset);
 
+    address user;
     for (uint256 i = 0; i < length; i++) {
-      address user = users[i];
-
-      for (uint256 j = i + 1; j < length; j++) {
-        if (user == users[j]) {
-          revert UsersShouldBeDifferent(user);
-        }
-      }
-
+      user = users[i];
       DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
 
       if (!usersCanHaveCollateral && userConfiguration.isUsingAsCollateralAny()) {
