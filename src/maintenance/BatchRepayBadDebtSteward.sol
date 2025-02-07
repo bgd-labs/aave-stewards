@@ -23,8 +23,9 @@ import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.
 /**
  * @title BatchRepayBadDebtSteward
  * @author BGD Labs
- * @notice This contract allows to repay all the bad debt of a list of users
- * @dev Only allowed those users that have some debt and doesn't have any collateral
+ * @notice This contract allows to liquidate or repay all the bad debt of a list of users
+ * @dev Repay of a bad debt is allowed only if a user doesn't have any collateral.
+ *      If he has some collateral, a liquidation is performed instead.
  */
 contract BatchRepayBadDebtSteward is
   IBatchRepayBadDebtSteward,
@@ -73,6 +74,33 @@ contract BatchRepayBadDebtSteward is
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
+  function batchRepayBadDebt(address asset, address[] memory users) external override onlyRole(CLEANUP) {
+    (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
+
+    ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), totalDebtAmount);
+    IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
+
+    for (uint256 i = 0; i < users.length; i++) {
+      POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
+    }
+
+    uint256 balanceLeft = IERC20(asset).balanceOf(address(this));
+    if (balanceLeft != 0) IERC20(asset).transfer(COLLECTOR, balanceLeft);
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
+  function rescueToken(address token) external override {
+    _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
+  function rescueEth() external override {
+    _emergencyEtherTransfer(COLLECTOR, address(this).balance);
+  }
+
+  /* PUBLIC FUNCTIONS */
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
   function batchLiquidateWithMaxCap(
     address debtAsset,
     address collateralAsset,
@@ -100,31 +128,6 @@ contract BatchRepayBadDebtSteward is
 
     // transfer back liquidated assets
     IERC20(POOL.getReserveAToken(collateralAsset)).safeTransfer(COLLECTOR, type(uint256).max);
-  }
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function batchRepayBadDebt(address asset, address[] memory users) external override onlyRole(CLEANUP) {
-    (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
-
-    ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), totalDebtAmount);
-    IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
-
-    for (uint256 i = 0; i < users.length; i++) {
-      POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
-    }
-
-    uint256 balanceLeft = IERC20(asset).balanceOf(address(this));
-    if (balanceLeft != 0) IERC20(asset).transfer(COLLECTOR, balanceLeft);
-  }
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function rescueToken(address token) external override {
-    _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
-  }
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function rescueEth() external override {
-    _emergencyEtherTransfer(COLLECTOR, address(this).balance);
   }
 
   /* PUBLIC VIEW FUNCTIONS */
@@ -174,6 +177,7 @@ contract BatchRepayBadDebtSteward is
 
       if (!usersCanHaveCollateral) {
         DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
+
         if (userConfiguration.isUsingAsCollateralAny()) {
           revert UserHasSomeCollateral(user);
         }
