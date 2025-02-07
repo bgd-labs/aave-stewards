@@ -127,7 +127,9 @@ contract BatchRepayBadDebtSteward is
     }
 
     // transfer back liquidated assets
-    IERC20(POOL.getReserveAToken(collateralAsset)).safeTransfer(COLLECTOR, type(uint256).max);
+    address collateralAToken = POOL.getReserveAToken(collateralAsset);
+    uint256 collateralATokenBalance = IERC20(collateralAToken).balanceOf(address(this));
+    IERC20(collateralAToken).safeTransfer(COLLECTOR, collateralATokenBalance);
   }
 
   /* PUBLIC VIEW FUNCTIONS */

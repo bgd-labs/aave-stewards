@@ -12,7 +12,7 @@ import {BatchRepayBadDebtSteward} from "../../../src/maintenance/BatchRepayBadDe
 
 import {BatchRepayBadDebtStewardBaseTest} from "../../maintenance/BatchRepayBadDebtSteward.t.sol";
 
-contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
+contract BatchRepayBadDebtStewardGasTest is BatchRepayBadDebtStewardBaseTest {
   function test_getBadDebtAmount_zero_users() public {
     _callGetBadDebtAmountWithNumberOfUsers(0);
 
@@ -256,31 +256,27 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
   function _callBatchLiquidateWithNumberOfUsers(uint256 userAmount) private {
     address[] memory users = new address[](userAmount);
-    address[] memory collaterals = new address[](userAmount);
     for (uint256 i = 0; i < userAmount; ++i) {
       users[i] = usersEligibleForLiquidations[i];
-      collaterals[i] = collateralsEligibleForLiquidations[i];
     }
 
     uint256 mintAmount = 1_000_000e18;
     deal(assetUnderlying, collector, mintAmount);
 
     vm.prank(guardian);
-    steward.batchLiquidate(assetUnderlying, collaterals, users);
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, users);
   }
 
   function _callBatchLiquidateWithMaxCapWithNumberOfUsers(uint256 userAmount) private {
     address[] memory users = new address[](userAmount);
-    address[] memory collaterals = new address[](userAmount);
     for (uint256 i = 0; i < userAmount; ++i) {
       users[i] = usersEligibleForLiquidations[i];
-      collaterals[i] = collateralsEligibleForLiquidations[i];
     }
 
     uint256 mintAmount = 1_000_000e18;
     deal(assetUnderlying, collector, mintAmount);
 
     vm.prank(guardian);
-    steward.batchLiquidateWithMaxCap(assetUnderlying, collaterals, users, totalDebtToLiquidate);
+    steward.batchLiquidateWithMaxCap(assetUnderlying, collateralEligibleForLiquidations, users, totalDebtToLiquidate);
   }
 }
