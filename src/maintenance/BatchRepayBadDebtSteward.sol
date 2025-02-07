@@ -9,9 +9,6 @@ import {ICollector, IERC20 as IERC20Col} from "aave-v3-origin/contracts/treasury
 import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuableBase.sol";
 import {RescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
-import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
-import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
-
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
@@ -23,17 +20,34 @@ import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.
 /**
  * @title BatchRepayBadDebtSteward
  * @author BGD Labs
- * @notice This contract allows to liquidate or repay all the bad debt of a list of users
- * @dev Repay of a bad debt is allowed only if a user doesn't have any collateral.
- *      If he has some collateral, a liquidation is performed instead.
+ * @notice This contract helps with the liquidation or repayment of bad debt for
+ * a list of users within the Aave V3 protocol.
+ * All funds for those operations are pulled from the Aave Collector.
+ *
+ * Repayment of bad debt is permitted only for users without any collateral.
+ * If a user has collateral, a liquidation should be performed instead.
+ *
+ * The contract inherits from `Multicall`. Using the `multicall` function from this contract\
+ * multiple liquidation or repayment operations could be bundled into a single transaction.
+ *
+ * -- Security Considerations --
+ *
+ * The contract is not upgradable and should never hold any funds.
+ * If for any reason funds are stuck on the contract, they are rescuable to the Aave Collector (the recipient address cannot be changed).
+ * This can be done by calling the `rescueToken` or `rescueEth` functions that are open to everyone.
+ *
+ * The contract can only:
+ * - repay a pure bad debt (the debt without any collateral)
+ * - liquidate users that are already eligible for a liquidation
+ *
+ * Therefore even when there is a certain level of trust given to the permissioned entity, there is no
+ * possibility for any actor to enrich themselves.
+ *
+ * --- Access control
+ * Upon creation, a DAO-permitted entity is configured as the AccessControl default admin.
+ * For operational flexibility, this entity can give permissions to other addresses (`CLEANUP` role).
  */
-contract BatchRepayBadDebtSteward is
-  IBatchRepayBadDebtSteward,
-  RescuableBase,
-  OwnableWithGuardian,
-  Multicall,
-  AccessControl
-{
+contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
   using UserConfiguration for DataTypes.UserConfigurationMap;
 
@@ -50,9 +64,7 @@ contract BatchRepayBadDebtSteward is
 
   /* CONSTRUCTOR */
 
-  constructor(address _pool, address _guardian, address _owner, address _collector)
-    OwnableWithGuardian(_owner, _guardian)
-  {
+  constructor(address _pool, address _collector, address admin, address _guardian) {
     if (_pool == address(0) || _collector == address(0)) {
       revert ZeroAddress();
     }
@@ -60,7 +72,7 @@ contract BatchRepayBadDebtSteward is
     POOL = IPool(_pool);
     COLLECTOR = _collector;
 
-    _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+    _grantRole(DEFAULT_ADMIN_ROLE, admin);
     _grantRole(CLEANUP, _guardian);
   }
 

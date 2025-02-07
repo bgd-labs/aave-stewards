@@ -55,13 +55,13 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
 
   address public guardian = address(0x101);
 
-  address public owner = address(0x102);
+  address public admin = address(0x102);
 
   address public collector = address(AaveV3Avalanche.COLLECTOR);
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 56921378); // https://snowscan.xyz/block/56768474
-    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), guardian, owner, collector);
+    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian);
 
     // collector upgrade
     GovV3Helpers.executePayload(vm, 65);
@@ -70,16 +70,13 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
     vm.prank(AaveV3Avalanche.ACL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
 
-    assertEq(steward.guardian(), guardian);
-    assertEq(steward.owner(), owner);
-
     vm.prank(collector);
     IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
 
     vm.label(address(AaveV3Avalanche.POOL), "Pool");
     vm.label(address(steward), "BatchRepayBadDebtSteward");
     vm.label(guardian, "Guardian");
-    vm.label(owner, "Owner");
+    vm.label(admin, "Admin");
     vm.label(collector, "Collector");
     vm.label(assetUnderlying, "AssetUnderlying");
     vm.label(assetDebtToken, "AssetDebtToken");
@@ -231,28 +228,12 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     );
   }
 
-  function test_rescueToken_with_guardian() public {
+  function test_rescueToken() public {
     uint256 mintAmount = 1_000_000e18;
     deal(assetUnderlying, address(steward), mintAmount);
 
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
 
-    vm.prank(guardian);
-    steward.rescueToken(assetUnderlying);
-
-    uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
-
-    assertEq(collectorBalanceAfter - collectorBalanceBefore, mintAmount);
-    assertEq(IERC20(assetUnderlying).balanceOf(address(steward)), 0);
-  }
-
-  function test_rescueToken_with_owner() public {
-    uint256 mintAmount = 1_000_000e18;
-    deal(assetUnderlying, address(steward), mintAmount);
-
-    uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
-
-    vm.prank(owner);
     steward.rescueToken(assetUnderlying);
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
@@ -263,28 +244,12 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
   receive() external payable {}
 
-  function test_rescueEth_with_guardian() public {
+  function test_rescueEth() public {
     uint256 mintAmount = 1_000_000e18;
     deal(address(steward), mintAmount);
 
     uint256 collectorBalanceBefore = collector.balance;
 
-    vm.prank(guardian);
-    steward.rescueEth();
-
-    uint256 collectorBalanceAfter = collector.balance;
-
-    assertEq(collectorBalanceAfter - collectorBalanceBefore, mintAmount);
-    assertEq(address(steward).balance, 0);
-  }
-
-  function test_rescueEth_with_owner() public {
-    uint256 mintAmount = 1_000_000e18;
-    deal(address(steward), mintAmount);
-
-    uint256 collectorBalanceBefore = collector.balance;
-
-    vm.prank(owner);
     steward.rescueEth();
 
     uint256 collectorBalanceAfter = collector.balance;
