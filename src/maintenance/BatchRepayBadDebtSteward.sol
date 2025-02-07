@@ -4,27 +4,36 @@ pragma solidity ^0.8.0;
 import {IPool, DataTypes} from "aave-address-book/AaveV3.sol";
 
 import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
-
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
-import {SafeERC20} from "solidity-utils/contracts/oz-common/SafeERC20.sol";
+import {ICollector, IERC20 as IERC20Col} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 
 import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuableBase.sol";
 import {RescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 
 import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
-import {Context as OzCommonContext} from "solidity-utils/contracts/oz-common/Context.sol";
 
 import {AccessControl} from "openzeppelin-contracts/contracts/access/AccessControl.sol";
-import {Context as OzContext} from "openzeppelin-contracts/contracts/utils/Context.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
+
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.sol";
 
-/// @title BatchRepayBadDebtSteward
-/// @author BGD Labs
-/// @notice This contract allows to repay all the bad debt of a list of users
-/// @dev Only allowed those users that have some debt and doesn't have any collateral
-contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, OwnableWithGuardian, AccessControl {
+/**
+ * @title BatchRepayBadDebtSteward
+ * @author BGD Labs
+ * @notice This contract allows to liquidate or repay all the bad debt of a list of users
+ * @dev Repay of a bad debt is allowed only if a user doesn't have any collateral.
+ *      If he has some collateral, a liquidation is performed instead.
+ */
+contract BatchRepayBadDebtSteward is
+  IBatchRepayBadDebtSteward,
+  RescuableBase,
+  OwnableWithGuardian,
+  Multicall,
+  AccessControl
+{
   using SafeERC20 for IERC20;
   using UserConfiguration for DataTypes.UserConfigurationMap;
 
@@ -41,21 +50,15 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
 
   /* CONSTRUCTOR */
 
-  constructor(address _pool, address _guardian, address _owner, address _collector) {
-    if (_pool == address(0) || _guardian == address(0) || _owner == address(0) || _collector == address(0)) {
+  constructor(address _pool, address _guardian, address _owner, address _collector)
+    OwnableWithGuardian(_owner, _guardian)
+  {
+    if (_pool == address(0) || _collector == address(0)) {
       revert ZeroAddress();
     }
 
     POOL = IPool(_pool);
     COLLECTOR = _collector;
-
-    if (msg.sender != _guardian) {
-      _updateGuardian(_guardian);
-    }
-
-    if (msg.sender != _owner) {
-      _transferOwnership(_owner);
-    }
 
     _grantRole(DEFAULT_ADMIN_ROLE, _owner);
     _grantRole(CLEANUP, _guardian);
@@ -64,31 +67,52 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
   /* EXTERNAL FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
-  function batchLiquidate(address debtAsset, address[] memory collateralAssets, address[] memory users)
-    external
-    override
-  {
-    (uint256 totalDebtAmount,) = getDebtAmount(debtAsset, users);
+  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users) external override {
+    (uint256 maxDebtAmount,) = getDebtAmount(debtAsset, users);
 
-    batchLiquidateWithMaxCap(debtAsset, totalDebtAmount, collateralAssets, users);
+    batchLiquidateWithMaxCap(debtAsset, collateralAsset, users, maxDebtAmount);
   }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
+  function batchRepayBadDebt(address asset, address[] memory users) external override onlyRole(CLEANUP) {
+    (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
+
+    ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), totalDebtAmount);
+    IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
+
+    for (uint256 i = 0; i < users.length; i++) {
+      POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
+    }
+
+    uint256 balanceLeft = IERC20(asset).balanceOf(address(this));
+    if (balanceLeft != 0) IERC20(asset).transfer(COLLECTOR, balanceLeft);
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
+  function rescueToken(address token) external override {
+    _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
+  function rescueEth() external override {
+    _emergencyEtherTransfer(COLLECTOR, address(this).balance);
+  }
+
+  /* PUBLIC FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
   function batchLiquidateWithMaxCap(
     address debtAsset,
-    uint256 debtTokenAmount,
-    address[] memory collateralAssets,
-    address[] memory users
+    address collateralAsset,
+    address[] memory users,
+    uint256 maxDebtTokenAmount
   ) public override onlyRole(CLEANUP) {
-    uint256 balanceBefore = IERC20(debtAsset).balanceOf(address(this));
+    ICollector(COLLECTOR).transfer(IERC20Col(debtAsset), address(this), maxDebtTokenAmount);
+    IERC20(debtAsset).forceApprove(address(POOL), maxDebtTokenAmount);
 
-    IERC20(debtAsset).safeTransferFrom(COLLECTOR, address(this), debtTokenAmount);
-    IERC20(debtAsset).forceApprove(address(POOL), debtTokenAmount);
-
-    uint256 length = users.length;
-    for (uint256 i = 0; i < length; i++) {
+    for (uint256 i = 0; i < users.length; i++) {
       POOL.liquidationCall({
-        collateralAsset: collateralAssets[i],
+        collateralAsset: collateralAsset,
         debtAsset: debtAsset,
         user: users[i],
         debtToCover: type(uint256).max,
@@ -96,34 +120,16 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
       });
     }
 
+    // transfer back surplus
     uint256 balanceAfter = IERC20(debtAsset).balanceOf(address(this));
-
-    if (balanceAfter > balanceBefore) {
-      IERC20(debtAsset).safeTransfer(COLLECTOR, balanceAfter - balanceBefore);
+    if (balanceAfter != 0) {
+      IERC20(debtAsset).safeTransfer(COLLECTOR, balanceAfter);
     }
-  }
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function batchRepayBadDebt(address asset, address[] memory users) external override onlyRole(CLEANUP) {
-    (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
-
-    IERC20(asset).safeTransferFrom(COLLECTOR, address(this), totalDebtAmount);
-    IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
-
-    uint256 length = users.length;
-    for (uint256 i = 0; i < length; i++) {
-      POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
-    }
-  }
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function rescueToken(address token) external override onlyOwnerOrGuardian {
-    _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
-  }
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function rescueEth() external override onlyOwnerOrGuardian {
-    _emergencyEtherTransfer(COLLECTOR, address(this).balance);
+    // transfer back liquidated assets
+    address collateralAToken = POOL.getReserveAToken(collateralAsset);
+    uint256 collateralATokenBalance = IERC20(collateralAToken).balanceOf(address(this));
+    IERC20(collateralAToken).safeTransfer(COLLECTOR, collateralATokenBalance);
   }
 
   /* PUBLIC VIEW FUNCTIONS */
@@ -153,16 +159,6 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
     return IERC20(erc20Token).balanceOf(address(this));
   }
 
-  /* INTERNAL FUNCTIONS */
-
-  function _msgSender() internal view override(OzCommonContext, OzContext) returns (address) {
-    return msg.sender;
-  }
-
-  function _msgData() internal pure override(OzCommonContext, OzContext) returns (bytes calldata) {
-    return msg.data;
-  }
-
   /* PRIVATE VIEW FUNCTIONS */
 
   function _getUsersDebtAmounts(address asset, address[] memory users, bool usersCanHaveCollateral)
@@ -175,24 +171,21 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, O
     uint256 totalDebtAmount;
     uint256[] memory debtAmounts = new uint256[](length);
 
-    DataTypes.ReserveDataLegacy memory reserveData = POOL.getReserveData(asset);
+    address variableDebtTokenAddress = POOL.getReserveVariableDebtToken(asset);
 
+    address user;
     for (uint256 i = 0; i < length; i++) {
-      address user = users[i];
+      user = users[i];
 
-      for (uint256 j = i + 1; j < length; j++) {
-        if (user == users[j]) {
-          revert UsersShouldBeDifferent(user);
+      if (!usersCanHaveCollateral) {
+        DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
+
+        if (userConfiguration.isUsingAsCollateralAny()) {
+          revert UserHasSomeCollateral(user);
         }
       }
 
-      DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
-
-      if (!usersCanHaveCollateral && userConfiguration.isUsingAsCollateralAny()) {
-        revert UserHasSomeCollateral(user);
-      }
-
-      totalDebtAmount += debtAmounts[i] = IERC20(reserveData.variableDebtTokenAddress).balanceOf(user);
+      totalDebtAmount += debtAmounts[i] = IERC20(variableDebtTokenAddress).balanceOf(user);
     }
 
     return (totalDebtAmount, debtAmounts);

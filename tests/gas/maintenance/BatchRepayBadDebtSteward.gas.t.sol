@@ -5,14 +5,14 @@ import {Test} from "forge-std/Test.sol";
 
 import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
 import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import {IBatchRepayBadDebtSteward} from "../../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol";
 import {BatchRepayBadDebtSteward} from "../../../src/maintenance/BatchRepayBadDebtSteward.sol";
 
 import {BatchRepayBadDebtStewardBaseTest} from "../../maintenance/BatchRepayBadDebtSteward.t.sol";
 
-contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
+contract BatchRepayBadDebtStewardGasTest is BatchRepayBadDebtStewardBaseTest {
   function test_getBadDebtAmount_zero_users() public {
     _callGetBadDebtAmountWithNumberOfUsers(0);
 
@@ -256,31 +256,27 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
   function _callBatchLiquidateWithNumberOfUsers(uint256 userAmount) private {
     address[] memory users = new address[](userAmount);
-    address[] memory collaterals = new address[](userAmount);
     for (uint256 i = 0; i < userAmount; ++i) {
       users[i] = usersEligibleForLiquidations[i];
-      collaterals[i] = collateralsEligibleForLiquidations[i];
     }
 
     uint256 mintAmount = 1_000_000e18;
     deal(assetUnderlying, collector, mintAmount);
 
     vm.prank(guardian);
-    steward.batchLiquidate(assetUnderlying, collaterals, users);
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, users);
   }
 
   function _callBatchLiquidateWithMaxCapWithNumberOfUsers(uint256 userAmount) private {
     address[] memory users = new address[](userAmount);
-    address[] memory collaterals = new address[](userAmount);
     for (uint256 i = 0; i < userAmount; ++i) {
       users[i] = usersEligibleForLiquidations[i];
-      collaterals[i] = collateralsEligibleForLiquidations[i];
     }
 
     uint256 mintAmount = 1_000_000e18;
     deal(assetUnderlying, collector, mintAmount);
 
     vm.prank(guardian);
-    steward.batchLiquidateWithMaxCap(assetUnderlying, totalDebtToLiquidate, collaterals, users);
+    steward.batchLiquidateWithMaxCap(assetUnderlying, collateralEligibleForLiquidations, users, totalDebtToLiquidate);
   }
 }

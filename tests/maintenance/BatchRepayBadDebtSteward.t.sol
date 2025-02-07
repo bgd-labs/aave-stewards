@@ -3,10 +3,12 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 
+import {GovV3Helpers} from "aave-helpers/src/GovV3Helpers.sol";
+
 import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
 import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
 
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 import {IBatchRepayBadDebtSteward} from "../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol";
@@ -31,21 +33,14 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
   uint256[] public usersBadDebtAmounts;
 
   address[] public usersEligibleForLiquidations = [
-    0xb5FDf295d6C7a4E7f466EDb4B4d9aEAaeF37A9Dd,
-    0x07d89372dAa468575b7fbd814E4A9D59e38d414b,
-    0x741BeB5C2D744f8aCc8f54fbACa1880911D2cB32,
     0x6821Aceb02Bd2a64d0900cBf193A543aB41d397e,
-    0x04249B0B26eA4a91F4F36d95c6CD11a207e22768,
-    0x35cBb2525e442488Ed51cE524b4000D4d0d01acC
+    0x5822fb7f7eC70258abe638a6E8637FEd206311F7,
+    0x35cBb2525e442488Ed51cE524b4000D4d0d01acC,
+    0xE32655B320e77a7103e0837282106677F2C28dCb,
+    0x042F53D7250c49f9DCCc54b1A1CFafB16d8A0633,
+    0x4dAad5b1B9A4c60F1Bd18A0890AF6794A2242a7E
   ];
-  address[] public collateralsEligibleForLiquidations = [
-    AaveV3AvalancheAssets.USDt_UNDERLYING,
-    AaveV3AvalancheAssets.DAIe_UNDERLYING,
-    AaveV3AvalancheAssets.WAVAX_UNDERLYING,
-    AaveV3AvalancheAssets.USDC_UNDERLYING,
-    AaveV3AvalancheAssets.USDC_UNDERLYING,
-    AaveV3AvalancheAssets.USDC_UNDERLYING
-  ];
+  address collateralEligibleForLiquidations = AaveV3AvalancheAssets.USDC_UNDERLYING;
   uint256[] public usersEligibleForLiquidationsDebtAmounts;
   uint256 public totalDebtToLiquidate;
 
@@ -65,9 +60,15 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
   address public collector = address(AaveV3Avalanche.COLLECTOR);
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("avalanche"), 55793443); // https://snowscan.xyz/block/55793443
-
+    vm.createSelectFork(vm.rpcUrl("avalanche"), 56921378); // https://snowscan.xyz/block/56768474
     steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), guardian, owner, collector);
+
+    // collector upgrade
+    GovV3Helpers.executePayload(vm, 65);
+    // v3.3 pool upgrade
+    GovV3Helpers.executePayload(vm, 67);
+    vm.prank(AaveV3Avalanche.ACL_ADMIN);
+    IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
 
     assertEq(steward.guardian(), guardian);
     assertEq(steward.owner(), owner);
@@ -92,6 +93,8 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
       usersBadDebtAmounts.push(currentDebtAmount);
     }
 
+    DataTypes.ReserveDataLegacy memory collateralReserveData =
+      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
 
@@ -100,8 +103,6 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
       totalDebtToLiquidate += currentDebtAmount;
       usersEligibleForLiquidationsDebtAmounts.push(currentDebtAmount);
 
-      DataTypes.ReserveDataLegacy memory collateralReserveData =
-        AaveV3Avalanche.POOL.getReserveData(collateralsEligibleForLiquidations[i]);
       uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
 
       assertNotEq(collateralBalance, 0);
@@ -141,62 +142,64 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
   }
 
   function test_batchLiquidate() public {
-    deal(assetUnderlying, collector, totalDebtToLiquidate);
-
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
+    DataTypes.ReserveDataLegacy memory collateralReserveData =
+      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
+    uint256 collectorCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
+    uint256 stewardCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
+
     vm.prank(guardian);
-    steward.batchLiquidate(assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations);
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations);
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
 
+    uint256 collectorCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
+    uint256 stewardCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
+
     assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
     assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
 
+    assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
+
     assertEq(stewardBalanceBefore, stewardBalanceAfter);
+    assertEq(stewardCollateralBalanceBefore, stewardCollateralBalanceAfter);
 
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
 
-      DataTypes.ReserveDataLegacy memory collateralReserveData =
-        AaveV3Avalanche.POOL.getReserveData(collateralsEligibleForLiquidations[i]);
       uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
 
-      assertTrue(currentDebtAmount <= 1 || collateralBalance <= 1);
+      assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
     }
   }
 
   function test_batchLiquidateWithMaxCap() public {
     uint256 passedAmount = totalDebtToLiquidate - 100;
 
-    deal(assetUnderlying, address(steward), passedAmount);
-
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
-    uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
     vm.prank(guardian);
     steward.batchLiquidateWithMaxCap(
-      assetUnderlying, passedAmount, collateralsEligibleForLiquidations, usersEligibleForLiquidations
+      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, passedAmount
     );
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
-    uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
-    assertTrue(collectorBalanceBefore - collectorBalanceAfter <= passedAmount);
+    assertTrue(collectorBalanceBefore >= collectorBalanceAfter, "EXPECTED_BALANCE_DECREASE");
+    assertTrue(collectorBalanceBefore - collectorBalanceAfter <= passedAmount, "OVERSPENT");
 
-    assertEq(stewardBalanceBefore, stewardBalanceAfter);
+    DataTypes.ReserveDataLegacy memory collateralReserveData =
+      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
 
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
 
-      DataTypes.ReserveDataLegacy memory collateralReserveData =
-        AaveV3Avalanche.POOL.getReserveData(collateralsEligibleForLiquidations[i]);
       uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
 
-      assertTrue(currentDebtAmount <= 1 || collateralBalance <= 1);
+      assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
     }
   }
 
@@ -210,7 +213,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     );
 
     vm.prank(caller);
-    steward.batchLiquidate(assetUnderlying, collateralsEligibleForLiquidations, usersEligibleForLiquidations);
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations);
   }
 
   function test_reverts_batchLiquidateWithMaxCap_caller_not_cleaner(address caller) public {
@@ -224,7 +227,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     vm.prank(caller);
     steward.batchLiquidateWithMaxCap(
-      assetUnderlying, 1, collateralsEligibleForLiquidations, usersEligibleForLiquidations
+      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, 1
     );
   }
 
@@ -256,18 +259,6 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     assertEq(collectorBalanceAfter - collectorBalanceBefore, mintAmount);
     assertEq(IERC20(assetUnderlying).balanceOf(address(steward)), 0);
-  }
-
-  function test_reverts_rescueToken_with_notGuardianOrOwner(address caller) public {
-    vm.assume(caller != guardian && caller != owner);
-
-    uint256 mintAmount = 1_000_000e18;
-    deal(assetUnderlying, address(steward), mintAmount);
-
-    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
-
-    vm.prank(caller);
-    steward.rescueToken(assetUnderlying);
   }
 
   receive() external payable {}
@@ -302,18 +293,6 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     assertEq(address(steward).balance, 0);
   }
 
-  function test_reverts_rescueEth_with_notGuardianOrOwner(address caller) public {
-    vm.assume(caller != guardian && caller != owner);
-
-    uint256 mintAmount = 1_000_000e18;
-    deal(address(steward), mintAmount);
-
-    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
-
-    vm.prank(caller);
-    steward.rescueEth();
-  }
-
   function test_getDebtAmount() public view {
     (uint256 receivedTotalDebt, uint256[] memory receivedUsersDebtAmounts) =
       steward.getDebtAmount(assetUnderlying, usersEligibleForLiquidations);
@@ -336,30 +315,6 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     for (uint256 i = 0; i < usersBadDebtAmounts.length; i++) {
       assertEq(receivedUsersBadDebtAmounts[i], usersBadDebtAmounts[i]);
     }
-  }
-
-  function test_reverts_getDebtAmount_duplicatedUsers() public {
-    address[] memory passedArray = new address[](2);
-    passedArray[0] = usersWithBadDebt[0];
-    passedArray[1] = usersWithBadDebt[0];
-
-    vm.expectRevert(
-      abi.encodePacked(IBatchRepayBadDebtSteward.UsersShouldBeDifferent.selector, uint256(uint160(passedArray[0])))
-    );
-
-    steward.getDebtAmount(assetUnderlying, passedArray);
-  }
-
-  function test_reverts_getBadDebtAmount_duplicatedUsers() public {
-    address[] memory passedArray = new address[](2);
-    passedArray[0] = usersWithBadDebt[0];
-    passedArray[1] = usersWithBadDebt[0];
-
-    vm.expectRevert(
-      abi.encodePacked(IBatchRepayBadDebtSteward.UsersShouldBeDifferent.selector, uint256(uint160(passedArray[0])))
-    );
-
-    steward.getBadDebtAmount(assetUnderlying, passedArray);
   }
 
   function test_reverts_getBadDebtAmount_userHasSomeCollateral() public {
