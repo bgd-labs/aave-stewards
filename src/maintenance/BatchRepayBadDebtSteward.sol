@@ -94,20 +94,8 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
-  function rescueToken(address token) external override {
-    _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
-  }
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function rescueEth() external override {
-    _emergencyEtherTransfer(COLLECTOR, address(this).balance);
-  }
-
-  /* PUBLIC FUNCTIONS */
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
   function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users, bool useAToken)
-    public
+    external
     override
     onlyRole(CLEANUP)
   {
@@ -127,12 +115,22 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
       });
     }
 
-    // the excess is alwas in the underlying
+    // the excess is always in the underlying
     _transferExcessToCollector(debtAsset);
 
     // transfer back liquidated assets
     address collateralAToken = POOL.getReserveAToken(collateralAsset);
     _transferExcessToCollector(collateralAToken);
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
+  function rescueToken(address token) external override {
+    _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
+  }
+
+  /// @inheritdoc IBatchRepayBadDebtSteward
+  function rescueEth() external override {
+    _emergencyEtherTransfer(COLLECTOR, address(this).balance);
   }
 
   /* PUBLIC VIEW FUNCTIONS */
