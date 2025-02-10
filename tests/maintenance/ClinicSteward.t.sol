@@ -11,11 +11,11 @@ import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Av
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
-import {IBatchRepayBadDebtSteward} from "../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol";
-import {BatchRepayBadDebtSteward} from "../../src/maintenance/BatchRepayBadDebtSteward.sol";
+import {IClinicSteward} from "../../src/maintenance/interfaces/IClinicSteward.sol";
+import {ClinicSteward} from "../../src/maintenance/ClinicSteward.sol";
 
-contract BatchRepayBadDebtStewardBaseTest is Test {
-  BatchRepayBadDebtSteward public steward;
+contract ClinicStewardBaseTest is Test {
+  ClinicSteward public steward;
 
   address public assetUnderlying = AaveV3AvalancheAssets.BTCb_UNDERLYING;
   address public assetAToken = AaveV3AvalancheAssets.BTCb_A_TOKEN;
@@ -61,7 +61,7 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
-    steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian);
+    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian);
 
     // v3.3 pool upgrade
     GovV3Helpers.executePayload(vm, 67);
@@ -72,7 +72,7 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
     IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
 
     vm.label(address(AaveV3Avalanche.POOL), "Pool");
-    vm.label(address(steward), "BatchRepayBadDebtSteward");
+    vm.label(address(steward), "ClinicSteward");
     vm.label(guardian, "Guardian");
     vm.label(admin, "Admin");
     vm.label(collector, "Collector");
@@ -105,7 +105,7 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
   }
 }
 
-contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
+contract ClinicStewardTest is ClinicStewardBaseTest {
   function test_batchRepayBadDebt() public {
     deal(assetUnderlying, collector, totalBadDebt);
 
@@ -298,7 +298,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
   function test_reverts_getBadDebtAmount_userHasSomeCollateral() public {
     vm.expectRevert(
-      abi.encodePacked(IBatchRepayBadDebtSteward.UserHasSomeCollateral.selector, uint256(uint160(usersWithGoodDebt[0])))
+      abi.encodePacked(IClinicSteward.UserHasSomeCollateral.selector, uint256(uint160(usersWithGoodDebt[0])))
     );
 
     steward.getBadDebtAmount(assetUnderlying, usersWithGoodDebt);
