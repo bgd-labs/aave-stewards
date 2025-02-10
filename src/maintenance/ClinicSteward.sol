@@ -15,10 +15,10 @@ import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.sol";
+import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
 
 /**
- * @title BatchRepayBadDebtSteward
+ * @title ClinicSteward
  * @author BGD Labs
  * @notice This contract helps with the liquidation or repayment of bad debt for
  * a list of users within the Aave V3 protocol.
@@ -47,19 +47,19 @@ import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.
  * Upon creation, a DAO-permitted entity is configured as the AccessControl default admin.
  * For operational flexibility, this entity can give permissions to other addresses (`CLEANUP_ROLE` role).
  */
-contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, Multicall, AccessControl {
+contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
   using UserConfiguration for DataTypes.UserConfigurationMap;
 
   /* PUBLIC GLOBAL VARIABLES */
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   bytes32 public constant CLEANUP_ROLE = keccak256("CLEANUP_ROLE");
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   IPool public immutable override POOL;
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   address public immutable override COLLECTOR;
 
   /* CONSTRUCTOR */
@@ -77,7 +77,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   }
 
   /* EXTERNAL FUNCTIONS */
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   function batchRepayBadDebt(address asset, address[] memory users, bool useATokens)
     external
     override
@@ -93,7 +93,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     _transferExcessToCollector(asset);
   }
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users, bool useAToken)
     external
     override
@@ -122,19 +122,19 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     _transferExcessToCollector(collateralAToken);
   }
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   function rescueToken(address token) external override {
     _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
   }
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   function rescueEth() external override {
     _emergencyEtherTransfer(COLLECTOR, address(this).balance);
   }
 
   /* PUBLIC VIEW FUNCTIONS */
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   function getDebtAmount(address asset, address[] memory users)
     public
     view
@@ -144,7 +144,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     return _getUsersDebtAmounts({asset: asset, users: users, usersCanHaveCollateral: true});
   }
 
-  /// @inheritdoc IBatchRepayBadDebtSteward
+  /// @inheritdoc IClinicSteward
   function getBadDebtAmount(address asset, address[] memory users)
     public
     view

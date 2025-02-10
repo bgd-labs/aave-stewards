@@ -7,7 +7,7 @@ import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuab
 
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
-interface IBatchRepayBadDebtSteward is IRescuableBase, IAccessControl {
+interface IClinicSteward is IRescuableBase, IAccessControl {
   /* ERRORS */
 
   /// @notice Thrown when a user has some collateral. To repay a bad debt,
