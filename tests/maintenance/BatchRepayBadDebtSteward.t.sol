@@ -60,11 +60,9 @@ contract BatchRepayBadDebtStewardBaseTest is Test {
   address public collector = address(AaveV3Avalanche.COLLECTOR);
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("avalanche"), 56921378); // https://snowscan.xyz/block/56768474
+    vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
     steward = new BatchRepayBadDebtSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian);
 
-    // collector upgrade
-    GovV3Helpers.executePayload(vm, 65);
     // v3.3 pool upgrade
     GovV3Helpers.executePayload(vm, 67);
     vm.prank(AaveV3Avalanche.ACL_ADMIN);
