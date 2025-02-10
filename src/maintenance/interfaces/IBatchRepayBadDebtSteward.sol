@@ -21,7 +21,7 @@ interface IBatchRepayBadDebtSteward is IRescuableBase, IAccessControl {
   /* GLOBAL VARIABLES */
 
   /// @notice The role that allows to call the `batchLiquidate`, `batchLiquidateWithMaxCap` and `batchRepayBadDebt` functions
-  function CLEANUP() external view returns (bytes32);
+  function CLEANUP_ROLE() external view returns (bytes32);
 
   /// @notice The Aave pool
   function POOL() external view returns (IPool);

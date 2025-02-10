@@ -45,7 +45,7 @@ import {IBatchRepayBadDebtSteward} from "./interfaces/IBatchRepayBadDebtSteward.
  *
  * --- Access control
  * Upon creation, a DAO-permitted entity is configured as the AccessControl default admin.
- * For operational flexibility, this entity can give permissions to other addresses (`CLEANUP` role).
+ * For operational flexibility, this entity can give permissions to other addresses (`CLEANUP_ROLE` role).
  */
 contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
@@ -54,7 +54,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   /* PUBLIC GLOBAL VARIABLES */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
-  bytes32 public constant CLEANUP = keccak256("CLEANUP");
+  bytes32 public constant CLEANUP_ROLE = keccak256("CLEANUP_ROLE");
 
   /// @inheritdoc IBatchRepayBadDebtSteward
   IPool public immutable override POOL;
@@ -64,16 +64,16 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
 
   /* CONSTRUCTOR */
 
-  constructor(address _pool, address _collector, address admin, address _guardian) {
-    if (_pool == address(0) || _collector == address(0)) {
+  constructor(address pool, address collector, address admin, address cleanupRoleRecipient) {
+    if (pool == address(0) || collector == address(0)) {
       revert ZeroAddress();
     }
 
-    POOL = IPool(_pool);
-    COLLECTOR = _collector;
+    POOL = IPool(pool);
+    COLLECTOR = collector;
 
     _grantRole(DEFAULT_ADMIN_ROLE, admin);
-    _grantRole(CLEANUP, _guardian);
+    _grantRole(CLEANUP_ROLE, cleanupRoleRecipient);
   }
 
   /* EXTERNAL FUNCTIONS */
@@ -81,7 +81,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   function batchRepayBadDebt(address asset, address[] memory users, bool useATokens)
     external
     override
-    onlyRole(CLEANUP)
+    onlyRole(CLEANUP_ROLE)
   {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
     _pullFundsAndApprove(asset, totalDebtAmount, useATokens);
@@ -97,13 +97,12 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users, bool useAToken)
     external
     override
-    onlyRole(CLEANUP)
+    onlyRole(CLEANUP_ROLE)
   {
     // this is an over approximation as not necessarily all bad debt can be liquidated
     // the excess is transfered back to the collector
     (uint256 maxDebtAmount,) = getDebtAmount(debtAsset, users);
     _pullFundsAndApprove(debtAsset, maxDebtAmount, useAToken);
-    IERC20(debtAsset).forceApprove(address(POOL), maxDebtAmount);
 
     for (uint256 i = 0; i < users.length; i++) {
       POOL.liquidationCall({
@@ -167,15 +166,13 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     view
     returns (uint256, uint256[] memory)
   {
-    uint256 length = users.length;
-
     uint256 totalDebtAmount;
-    uint256[] memory debtAmounts = new uint256[](length);
+    uint256[] memory debtAmounts = new uint256[](users.length);
 
     address variableDebtTokenAddress = POOL.getReserveVariableDebtToken(asset);
 
     address user;
-    for (uint256 i = 0; i < length; i++) {
+    for (uint256 i = 0; i < users.length; i++) {
       user = users[i];
 
       if (!usersCanHaveCollateral) {
@@ -192,8 +189,8 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     return (totalDebtAmount, debtAmounts);
   }
 
-  function _pullFundsAndApprove(address asset, uint256 amount, bool unwrapAToken) internal {
-    if (unwrapAToken) {
+  function _pullFundsAndApprove(address asset, uint256 amount, bool useAToken) internal {
+    if (useAToken) {
       address aToken = POOL.getReserveAToken(asset);
       // 1 wei surplus to account for rounding on multiple operations
       ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 1);

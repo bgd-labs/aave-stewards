@@ -151,7 +151,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     vm.expectRevert(
       abi.encodePacked(
-        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.CLEANUP()
+        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.CLEANUP_ROLE()
       )
     );
 
@@ -234,7 +234,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     vm.expectRevert(
       abi.encodePacked(
-        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.CLEANUP()
+        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.CLEANUP_ROLE()
       )
     );
 
