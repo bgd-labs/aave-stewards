@@ -125,6 +125,29 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     }
   }
 
+  function test_batchRepayBadDebtUseAToken() public {
+    address aToken = AaveV3Avalanche.POOL.getReserveAToken(assetUnderlying);
+    uint256 collectorUnderlyingBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
+    uint256 collectorBalanceBefore = IERC20(aToken).balanceOf(collector);
+
+    vm.prank(guardian);
+    steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt, false);
+
+    uint256 collectorUnderlyingBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
+    uint256 collectorBalanceAfter = IERC20(aToken).balanceOf(collector);
+
+    assertApproxEqAbs(
+      (collectorBalanceBefore + collectorUnderlyingBalanceBefore)
+        - (collectorBalanceAfter + collectorUnderlyingBalanceAfter),
+      totalBadDebt,
+      100
+    );
+
+    for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
+      assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
+    }
+  }
+
   function test_reverts_batchRepayBadDebt_caller_not_cleaner(address caller) public {
     vm.assume(caller != guardian);
 
@@ -152,6 +175,34 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     assertTrue(collectorBalanceBefore >= collectorBalanceAfter, "EXPECTED_BALANCE_DECREASE");
     assertTrue(collectorBalanceBefore - collectorBalanceAfter <= passedAmount, "OVERSPENT");
+
+    DataTypes.ReserveDataLegacy memory collateralReserveData =
+      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
+
+    for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
+      uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
+
+      uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
+
+      assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
+    }
+  }
+
+  function test_batchLiquidateWithMaxCapUseAToken() public {
+    uint256 passedAmount = totalDebtToLiquidate - 100;
+
+    address collateralAToken = AaveV3Avalanche.POOL.getReserveAToken(assetUnderlying);
+    uint256 collectorBalanceBefore = IERC20(collateralAToken).balanceOf(collector);
+
+    vm.prank(guardian);
+    steward.batchLiquidateWithMaxCap(
+      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, passedAmount, true
+    );
+
+    uint256 collectorBalanceAfter = IERC20(collateralAToken).balanceOf(collector);
+
+    assertTrue(collectorBalanceBefore >= collectorBalanceAfter, "EXPECTED_BALANCE_DECREASE");
+    assertApproxEqAbs(collectorBalanceBefore - collectorBalanceAfter, passedAmount, 100, "OVERSPENT");
 
     DataTypes.ReserveDataLegacy memory collateralReserveData =
       AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
