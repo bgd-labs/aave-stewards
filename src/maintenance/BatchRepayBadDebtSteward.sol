@@ -90,7 +90,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
       POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
     }
 
-    _transferBackExcess(asset);
+    _transferExcessToCollector(asset);
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
@@ -128,11 +128,11 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     }
 
     // the excess is alwas in the underlying
-    _transferBackExcess(debtAsset);
+    _transferExcessToCollector(debtAsset);
 
     // transfer back liquidated assets
     address collateralAToken = POOL.getReserveAToken(collateralAsset);
-    _transferBackExcess(collateralAToken);
+    _transferExcessToCollector(collateralAToken);
   }
 
   /* PUBLIC VIEW FUNCTIONS */
@@ -206,7 +206,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     IERC20(asset).forceApprove(address(POOL), amount);
   }
 
-  function _transferBackExcess(address asset) internal {
+  function _transferExcessToCollector(address asset) internal {
     uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
     if (balanceAfter != 0) {
       IERC20(asset).safeTransfer(COLLECTOR, balanceAfter);
