@@ -31,27 +31,13 @@ interface IBatchRepayBadDebtSteward is IRescuableBase, IAccessControl {
 
   /* EXTERNAL FUNCTIONS */
 
-  /// @notice Liquidates all the users
-  /// @param debtAsset The address of the debt asset
-  /// @param collateralAsset The address of the collateral asset that will be liquidated
-  /// @param users The addresses of the users to liquidate
-  /// @dev This amount is pulled from the Aave collector. The contract sends
-  ///      any surplus back to the collector.
-  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users) external;
-
   /// @notice Liquidates all the users with a max debt amount to be liquidated
   /// @param debtAsset The address of the debt asset
   /// @param collateralAsset The address of the collateral asset that will be liquidated
   /// @param users The addresses of the users to liquidate
-  /// @param maxDebtTokenAmount The maximum amount of debt tokens to be liquidated
-  /// @dev This amount is pulled from the Aave collector. The contract sends
-  ///      any surplus back to the collector.
-  function batchLiquidateWithMaxCap(
-    address debtAsset,
-    address collateralAsset,
-    address[] memory users,
-    uint256 maxDebtTokenAmount
-  ) external;
+  /// @param useATokens If true the token will pull aTokens from the collector.
+  ///                   If false it will pull the underlying.
+  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users, bool useATokens) external;
 
   /// @notice Repays all the bad debt of users
   /// @dev Will revert if the user has a collateral or no debt.
@@ -59,7 +45,9 @@ interface IBatchRepayBadDebtSteward is IRescuableBase, IAccessControl {
   ///      any surplus back to the collector.
   /// @param asset The address of an asset to repay
   /// @param users The addresses of users to repay
-  function batchRepayBadDebt(address asset, address[] calldata users) external;
+  /// @param useATokens If true the token will pull aTokens from the collector.
+  ///                   If false it will pull the underlying.
+  function batchRepayBadDebt(address asset, address[] calldata users, bool useATokens) external;
 
   /// @notice Rescues the tokens
   /// @param token The address of the token to rescue
