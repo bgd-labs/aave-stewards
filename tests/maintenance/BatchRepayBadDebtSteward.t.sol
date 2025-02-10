@@ -161,23 +161,31 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt, false);
   }
 
-  function test_batchLiquidateWithMaxCap() public {
-    uint256 passedAmount = totalDebtToLiquidate - 100;
-
+  function test_batchLiquidate() public {
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
+    uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
+
+    DataTypes.ReserveDataLegacy memory collateralReserveData =
+      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
+    uint256 collectorCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
+    uint256 stewardCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
 
     vm.prank(guardian);
-    steward.batchLiquidateWithMaxCap(
-      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, passedAmount, false
-    );
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, false);
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
+    uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    assertTrue(collectorBalanceBefore >= collectorBalanceAfter, "EXPECTED_BALANCE_DECREASE");
-    assertTrue(collectorBalanceBefore - collectorBalanceAfter <= passedAmount, "OVERSPENT");
+    uint256 collectorCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
+    uint256 stewardCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
 
-    DataTypes.ReserveDataLegacy memory collateralReserveData =
-      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
+    assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
+    assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
+
+    assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
+
+    assertEq(stewardBalanceBefore, stewardBalanceAfter);
+    assertEq(stewardCollateralBalanceBefore, stewardCollateralBalanceAfter);
 
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
@@ -188,35 +196,42 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     }
   }
 
-  function test_batchLiquidateWithMaxCapUseAToken() public {
-    uint256 passedAmount = totalDebtToLiquidate - 100;
+  function test_batchLiquidateUseAToken() public {
+    address debtAToken = AaveV3Avalanche.POOL.getReserveAToken(assetUnderlying);
+    uint256 collectorBalanceBefore = IERC20(debtAToken).balanceOf(collector);
+    uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    address collateralAToken = AaveV3Avalanche.POOL.getReserveAToken(assetUnderlying);
-    uint256 collectorBalanceBefore = IERC20(collateralAToken).balanceOf(collector);
+    address collateralAToken = AaveV3Avalanche.POOL.getReserveAToken(collateralEligibleForLiquidations);
+    uint256 collectorCollateralBalanceBefore = IERC20(collateralAToken).balanceOf(collector);
+    uint256 stewardCollateralBalanceBefore = IERC20(collateralAToken).balanceOf(address(steward));
 
     vm.prank(guardian);
-    steward.batchLiquidateWithMaxCap(
-      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, passedAmount, true
-    );
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, true);
 
-    uint256 collectorBalanceAfter = IERC20(collateralAToken).balanceOf(collector);
+    uint256 collectorBalanceAfter = IERC20(debtAToken).balanceOf(collector);
+    uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    assertTrue(collectorBalanceBefore >= collectorBalanceAfter, "EXPECTED_BALANCE_DECREASE");
-    assertApproxEqAbs(collectorBalanceBefore - collectorBalanceAfter, passedAmount, 100, "OVERSPENT");
+    uint256 collectorCollateralBalanceAfter = IERC20(collateralAToken).balanceOf(collector);
+    uint256 stewardCollateralBalanceAfter = IERC20(collateralAToken).balanceOf(address(steward));
 
-    DataTypes.ReserveDataLegacy memory collateralReserveData =
-      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
+    assertGe(collectorBalanceBefore, collectorBalanceAfter);
+    assertLe(collectorBalanceBefore - collectorBalanceAfter, totalDebtToLiquidate + 1); // account for 1 wei rounding surplus
+
+    assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
+
+    assertEq(stewardBalanceBefore, stewardBalanceAfter);
+    assertEq(stewardCollateralBalanceBefore, stewardCollateralBalanceAfter);
 
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
 
-      uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
+      uint256 collateralBalance = IERC20(collateralAToken).balanceOf(usersEligibleForLiquidations[i]);
 
       assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
     }
   }
 
-  function test_reverts_batchLiquidateWithMaxCap_caller_not_cleaner(address caller) public {
+  function test_reverts_batchLiquidate_caller_not_cleaner(address caller) public {
     vm.assume(caller != guardian);
 
     vm.expectRevert(
@@ -226,9 +241,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     );
 
     vm.prank(caller);
-    steward.batchLiquidateWithMaxCap(
-      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, 1, false
-    );
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, false);
   }
 
   function test_rescueToken() public {

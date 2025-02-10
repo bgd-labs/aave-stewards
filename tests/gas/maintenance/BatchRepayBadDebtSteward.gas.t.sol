@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 
 import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
+import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import {IBatchRepayBadDebtSteward} from "../../../src/maintenance/interfaces/IBatchRepayBadDebtSteward.sol";
@@ -138,46 +139,46 @@ contract BatchRepayBadDebtStewardGasTest is BatchRepayBadDebtStewardBaseTest {
     vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchRepayBadDebt: with 6 users");
   }
 
-  function test_batchLiquidateWithMaxCap_zero_users() public {
-    _callBatchLiquidateWithMaxCapWithNumberOfUsers(0);
+  function test_batchLiquidate_zero_users() public {
+    _callBatchLiquidateWithNumberOfUsers(0);
 
-    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 0 users");
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 0 users");
   }
 
-  function test_batchLiquidateWithMaxCap_one_user() public {
-    _callBatchLiquidateWithMaxCapWithNumberOfUsers(1);
+  function test_batchLiquidate_one_user() public {
+    _callBatchLiquidateWithNumberOfUsers(1);
 
-    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 1 user");
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 1 user");
   }
 
-  function test_batchLiquidateWithMaxCap_two_users() public {
-    _callBatchLiquidateWithMaxCapWithNumberOfUsers(2);
+  function test_batchLiquidate_two_users() public {
+    _callBatchLiquidateWithNumberOfUsers(2);
 
-    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 2 users");
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 2 users");
   }
 
-  function test_batchLiquidateWithMaxCap_three_users() public {
-    _callBatchLiquidateWithMaxCapWithNumberOfUsers(3);
+  function test_batchLiquidate_three_users() public {
+    _callBatchLiquidateWithNumberOfUsers(3);
 
-    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 3 users");
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 3 users");
   }
 
-  function test_batchLiquidateWithMaxCap_four_users() public {
-    _callBatchLiquidateWithMaxCapWithNumberOfUsers(4);
+  function test_batchLiquidate_four_users() public {
+    _callBatchLiquidateWithNumberOfUsers(4);
 
-    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 4 users");
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 4 users");
   }
 
-  function test_batchLiquidateWithMaxCap_five_users() public {
-    _callBatchLiquidateWithMaxCapWithNumberOfUsers(5);
+  function test_batchLiquidate_five_users() public {
+    _callBatchLiquidateWithNumberOfUsers(5);
 
-    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 5 users");
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 5 users");
   }
 
-  function test_batchLiquidateWithMaxCap_six_users() public {
-    _callBatchLiquidateWithMaxCapWithNumberOfUsers(6);
+  function test_batchLiquidate_six_users() public {
+    _callBatchLiquidateWithNumberOfUsers(6);
 
-    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidateWithMaxCap: with 6 users");
+    vm.snapshotGasLastCall("BatchRepayBadDebtSteward", "function batchLiquidate: with 6 users");
   }
 
   function _callGetBadDebtAmountWithNumberOfUsers(uint256 userAmount) private view {
@@ -211,7 +212,7 @@ contract BatchRepayBadDebtStewardGasTest is BatchRepayBadDebtStewardBaseTest {
     steward.batchRepayBadDebt(assetUnderlying, users, false);
   }
 
-  function _callBatchLiquidateWithMaxCapWithNumberOfUsers(uint256 userAmount) private {
+  function _callBatchLiquidateWithNumberOfUsers(uint256 userAmount) private {
     address[] memory users = new address[](userAmount);
     for (uint256 i = 0; i < userAmount; ++i) {
       users[i] = usersEligibleForLiquidations[i];
@@ -221,8 +222,6 @@ contract BatchRepayBadDebtStewardGasTest is BatchRepayBadDebtStewardBaseTest {
     deal(assetUnderlying, collector, mintAmount);
 
     vm.prank(guardian);
-    steward.batchLiquidateWithMaxCap(
-      assetUnderlying, collateralEligibleForLiquidations, users, totalDebtToLiquidate, false
-    );
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, users, false);
   }
 }

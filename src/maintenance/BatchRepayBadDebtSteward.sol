@@ -106,15 +106,16 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   /* PUBLIC FUNCTIONS */
 
   /// @inheritdoc IBatchRepayBadDebtSteward
-  function batchLiquidateWithMaxCap(
-    address debtAsset,
-    address collateralAsset,
-    address[] memory users,
-    uint256 maxDebtTokenAmount,
-    bool useAToken
-  ) public override onlyRole(CLEANUP) {
-    _pullFundsAndApprove(debtAsset, maxDebtTokenAmount, useAToken);
-    IERC20(debtAsset).forceApprove(address(POOL), maxDebtTokenAmount);
+  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users, bool useAToken)
+    public
+    override
+    onlyRole(CLEANUP)
+  {
+    // this is an over approximation as not necessarily all bad debt can be liquidated
+    // the excess is transfered back to the collector
+    (uint256 maxDebtAmount,) = getDebtAmount(debtAsset, users);
+    _pullFundsAndApprove(debtAsset, maxDebtAmount, useAToken);
+    IERC20(debtAsset).forceApprove(address(POOL), maxDebtAmount);
 
     for (uint256 i = 0; i < users.length; i++) {
       POOL.liquidationCall({
@@ -126,6 +127,7 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
       });
     }
 
+    // the excess is alwas in the underlying
     _transferBackExcess(debtAsset);
 
     // transfer back liquidated assets
@@ -195,9 +197,9 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   function _pullFundsAndApprove(address asset, uint256 amount, bool unwrapAToken) internal {
     if (unwrapAToken) {
       address aToken = POOL.getReserveAToken(asset);
-      // 100 wei surplus to account for rounding on multiple operations
-      ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 100);
-      POOL.withdraw(asset, amount, address(this));
+      // 1 wei surplus to account for rounding on multiple operations
+      ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 1);
+      POOL.withdraw(asset, type(uint256).max, address(this));
     } else {
       ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), amount);
     }

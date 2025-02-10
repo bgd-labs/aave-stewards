@@ -35,18 +35,9 @@ interface IBatchRepayBadDebtSteward is IRescuableBase, IAccessControl {
   /// @param debtAsset The address of the debt asset
   /// @param collateralAsset The address of the collateral asset that will be liquidated
   /// @param users The addresses of the users to liquidate
-  /// @param maxDebtTokenAmount The maximum amount of debt tokens to be liquidated
-  /// @dev This amount is pulled from the Aave collector. The contract sends
-  ///      any surplus back to the collector.
   /// @param useATokens If true the token will pull aTokens from the collector.
   ///                   If false it will pull the underlying.
-  function batchLiquidateWithMaxCap(
-    address debtAsset,
-    address collateralAsset,
-    address[] memory users,
-    uint256 maxDebtTokenAmount,
-    bool useATokens
-  ) external;
+  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users, bool useATokens) external;
 
   /// @notice Repays all the bad debt of users
   /// @dev Will revert if the user has a collateral or no debt.
