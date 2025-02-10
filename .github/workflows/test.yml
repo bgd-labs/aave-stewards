@@ -1,4 +1,8 @@
-name: CI
+name: Test
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 on:
   push:
@@ -9,10 +13,7 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  check:
-    strategy:
-      fail-fast: true
-
+  test:
     name: Foundry project
     runs-on: ubuntu-latest
     steps:
@@ -20,10 +21,14 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - uses: bgd-labs/action-rpc-env@main
         with:
-          version: nightly
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+
+      - name: Run Foundry setup
+        uses: bgd-labs/github-workflows/.github/actions/foundry-setup@main
+        with:
+          ZKSYNC: "true"
 
       - name: Show Forge version
         run: |
@@ -34,12 +39,23 @@ jobs:
           forge fmt --check
         id: fmt
 
-      - name: Run Forge build
-        run: |
-          forge build --sizes
-        id: build
+      - name: Run Forge tests
+        id: test
+        uses: bgd-labs/github-workflows/.github/actions/foundry-test@main
+
+      - name: Run ZK tests
+        id: zktest
+        uses: bgd-labs/github-workflows/.github/actions/foundry-test@main
+        with:
+          ZKSYNC: true
+          ROOT_DIR: "zksync"
 
       - name: Run Forge tests
+        uses: bgd-labs/github-workflows/.github/actions/comment-artifact@main
+
+      # we let failing tests pass so we can log them in the comment, still we want the ci to fail
+      - name: Post test
+        if: ${{ steps.test.outputs.testStatus != 0 || steps.zktest.outputs.testStatus != 0 }}
         run: |
-          forge test -vvv
-        id: test
+          echo "tests failed"
+          exit 1
