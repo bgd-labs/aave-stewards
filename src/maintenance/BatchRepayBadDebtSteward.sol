@@ -77,27 +77,20 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
   }
 
   /* EXTERNAL FUNCTIONS */
-
   /// @inheritdoc IBatchRepayBadDebtSteward
-  function batchLiquidate(address debtAsset, address collateralAsset, address[] memory users) external override {
-    (uint256 maxDebtAmount,) = getDebtAmount(debtAsset, users);
-
-    batchLiquidateWithMaxCap(debtAsset, collateralAsset, users, maxDebtAmount);
-  }
-
-  /// @inheritdoc IBatchRepayBadDebtSteward
-  function batchRepayBadDebt(address asset, address[] memory users) external override onlyRole(CLEANUP) {
+  function batchRepayBadDebt(address asset, address[] memory users, bool useATokens)
+    external
+    override
+    onlyRole(CLEANUP)
+  {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
-
-    ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), totalDebtAmount);
-    IERC20(asset).forceApprove(address(POOL), totalDebtAmount);
+    _pullFundsAndApprove(asset, totalDebtAmount, useATokens);
 
     for (uint256 i = 0; i < users.length; i++) {
       POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
     }
 
-    uint256 balanceLeft = IERC20(asset).balanceOf(address(this));
-    if (balanceLeft != 0) IERC20(asset).transfer(COLLECTOR, balanceLeft);
+    _transferBackExcess(asset);
   }
 
   /// @inheritdoc IBatchRepayBadDebtSteward
@@ -117,9 +110,10 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     address debtAsset,
     address collateralAsset,
     address[] memory users,
-    uint256 maxDebtTokenAmount
+    uint256 maxDebtTokenAmount,
+    bool useAToken
   ) public override onlyRole(CLEANUP) {
-    ICollector(COLLECTOR).transfer(IERC20Col(debtAsset), address(this), maxDebtTokenAmount);
+    _pullFundsAndApprove(debtAsset, maxDebtTokenAmount, useAToken);
     IERC20(debtAsset).forceApprove(address(POOL), maxDebtTokenAmount);
 
     for (uint256 i = 0; i < users.length; i++) {
@@ -132,16 +126,11 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
       });
     }
 
-    // transfer back surplus
-    uint256 balanceAfter = IERC20(debtAsset).balanceOf(address(this));
-    if (balanceAfter != 0) {
-      IERC20(debtAsset).safeTransfer(COLLECTOR, balanceAfter);
-    }
+    _transferBackExcess(debtAsset);
 
     // transfer back liquidated assets
     address collateralAToken = POOL.getReserveAToken(collateralAsset);
-    uint256 collateralATokenBalance = IERC20(collateralAToken).balanceOf(address(this));
-    IERC20(collateralAToken).safeTransfer(COLLECTOR, collateralATokenBalance);
+    _transferBackExcess(collateralAToken);
   }
 
   /* PUBLIC VIEW FUNCTIONS */
@@ -201,5 +190,24 @@ contract BatchRepayBadDebtSteward is IBatchRepayBadDebtSteward, RescuableBase, M
     }
 
     return (totalDebtAmount, debtAmounts);
+  }
+
+  function _pullFundsAndApprove(address asset, uint256 amount, bool unwrapAToken) internal {
+    if (unwrapAToken) {
+      address aToken = POOL.getReserveAToken(asset);
+      // 100 wei surplus to account for rounding on multiple operations
+      ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 100);
+      POOL.withdraw(asset, amount, address(this));
+    } else {
+      ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), amount);
+    }
+    IERC20(asset).forceApprove(address(POOL), amount);
+  }
+
+  function _transferBackExcess(address asset) internal {
+    uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
+    if (balanceAfter != 0) {
+      IERC20(asset).safeTransfer(COLLECTOR, balanceAfter);
+    }
   }
 }

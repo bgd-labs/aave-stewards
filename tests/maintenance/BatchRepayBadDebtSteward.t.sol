@@ -114,7 +114,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
 
     vm.prank(guardian);
-    steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt);
+    steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt, false);
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
 
@@ -135,42 +135,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     );
 
     vm.prank(caller);
-    steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt);
-  }
-
-  function test_batchLiquidate() public {
-    uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
-    uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
-
-    DataTypes.ReserveDataLegacy memory collateralReserveData =
-      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
-    uint256 collectorCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
-    uint256 stewardCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
-
-    vm.prank(guardian);
-    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations);
-
-    uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
-    uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
-
-    uint256 collectorCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
-    uint256 stewardCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
-
-    assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
-    assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
-
-    assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
-
-    assertEq(stewardBalanceBefore, stewardBalanceAfter);
-    assertEq(stewardCollateralBalanceBefore, stewardCollateralBalanceAfter);
-
-    for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
-      uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
-
-      uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
-
-      assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
-    }
+    steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt, false);
   }
 
   function test_batchLiquidateWithMaxCap() public {
@@ -180,7 +145,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     vm.prank(guardian);
     steward.batchLiquidateWithMaxCap(
-      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, passedAmount
+      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, passedAmount, false
     );
 
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
@@ -200,19 +165,6 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
     }
   }
 
-  function test_reverts_batchLiquidate_caller_not_cleaner(address caller) public {
-    vm.assume(caller != guardian);
-
-    vm.expectRevert(
-      abi.encodePacked(
-        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.CLEANUP()
-      )
-    );
-
-    vm.prank(caller);
-    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations);
-  }
-
   function test_reverts_batchLiquidateWithMaxCap_caller_not_cleaner(address caller) public {
     vm.assume(caller != guardian);
 
@@ -224,7 +176,7 @@ contract BatchRepayBadDebtStewardTest is BatchRepayBadDebtStewardBaseTest {
 
     vm.prank(caller);
     steward.batchLiquidateWithMaxCap(
-      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, 1
+      assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, 1, false
     );
   }
 
