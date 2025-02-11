@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
 import {IRescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {GovernanceV3Ethereum} from "aave-address-book/GovernanceV3Ethereum.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
@@ -13,6 +14,10 @@ import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethe
 import {CollectorUtils} from "aave-helpers/src/CollectorUtils.sol";
 
 import {PoolExposureSteward, IPoolExposureSteward} from "src/finance/PoolExposureSteward.sol";
+
+interface TempCollector {
+    function grantRole(bytes32 role, address account) external;
+}
 
 /**
  * @dev Tests for PoolSteward contract
@@ -59,7 +64,10 @@ contract PoolExposureStewardTest is Test {
         vm.label(address(steward), "PoolSteward");
 
         vm.startPrank(EXECUTOR);
-        AaveV3Ethereum.COLLECTOR.setFundsAdmin(address(steward));
+        TempCollector(address(AaveV3Ethereum.COLLECTOR)).grantRole(
+            bytes32("FUNDS_ADMIN"),
+            address(steward)
+        ); // TODO: Remove once aave-address-book is updated
 
         vm.stopPrank();
 
@@ -75,7 +83,12 @@ contract Function_depositV3 is PoolExposureStewardTest {
     function test_revertsIf_notOwnerOrGuardian() public {
         vm.startPrank(alice);
 
-        vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector,
+                alice
+            )
+        );
         steward.depositV3(
             address(AaveV3Ethereum.POOL),
             AaveV3EthereumAssets.USDC_UNDERLYING,
@@ -121,7 +134,12 @@ contract Function_migrateV2toV3 is PoolExposureStewardTest {
     function test_revertsIf_notOwnerOrGuardian() public {
         vm.startPrank(alice);
 
-        vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector,
+                alice
+            )
+        );
         steward.migrateV2toV3(
             address(AaveV2Ethereum.POOL),
             address(AaveV3Ethereum.POOL),
@@ -168,20 +186,6 @@ contract Function_migrateV2toV3 is PoolExposureStewardTest {
         );
     }
 
-    function test_revertsIf_arrayLengthMismatch() public {
-        uint256[] memory amounts = new uint256[](1);
-        address[] memory underlyings = new address[](2);
-
-        vm.startPrank(guardian);
-        vm.expectRevert(IPoolExposureSteward.MismatchingArrayLength.selector);
-        steward.migrateV2toV3(
-            address(AaveV2Ethereum.POOL),
-            address(AaveV3Ethereum.POOL),
-            underlyings,
-            amounts
-        );
-    }
-
     function test_success() public {
         uint256 balanceV2Before = IERC20(AaveV2EthereumAssets.USDC_A_TOKEN)
             .balanceOf(address(AaveV3Ethereum.COLLECTOR));
@@ -195,41 +199,6 @@ contract Function_migrateV2toV3 is PoolExposureStewardTest {
             address(AaveV3Ethereum.POOL),
             AaveV3EthereumAssets.USDC_UNDERLYING,
             1_000e6
-        );
-
-        assertLt(
-            IERC20(AaveV2EthereumAssets.USDC_A_TOKEN).balanceOf(
-                address(AaveV3Ethereum.COLLECTOR)
-            ),
-            balanceV2Before
-        );
-        assertGt(
-            IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(
-                address(AaveV3Ethereum.COLLECTOR)
-            ),
-            balanceV3Before
-        );
-        vm.stopPrank();
-    }
-
-    function test_success_arrays() public {
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 1_000e6;
-        address[] memory underlyings = new address[](1);
-        underlyings[0] = AaveV3EthereumAssets.USDC_UNDERLYING;
-
-        uint256 balanceV2Before = IERC20(AaveV2EthereumAssets.USDC_A_TOKEN)
-            .balanceOf(address(AaveV3Ethereum.COLLECTOR));
-        uint256 balanceV3Before = IERC20(AaveV3EthereumAssets.USDC_A_TOKEN)
-            .balanceOf(address(AaveV3Ethereum.COLLECTOR));
-
-        vm.startPrank(guardian);
-
-        steward.migrateV2toV3(
-            address(AaveV2Ethereum.POOL),
-            address(AaveV3Ethereum.POOL),
-            underlyings,
-            amounts
         );
 
         assertLt(
@@ -252,7 +221,12 @@ contract Function_migrateBetweenV3 is PoolExposureStewardTest {
     function test_revertsIf_notOwnerOrGuardian() public {
         vm.startPrank(alice);
 
-        vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector,
+                alice
+            )
+        );
         steward.migrateBetweenV3(
             address(AaveV3Ethereum.POOL),
             address(AaveV3Ethereum.POOL),
@@ -273,20 +247,6 @@ contract Function_migrateBetweenV3 is PoolExposureStewardTest {
             0
         );
         vm.stopPrank();
-    }
-
-    function test_revertsIf_arrayLengthMismatch() public {
-        uint256[] memory amounts = new uint256[](1);
-        address[] memory underlyings = new address[](2);
-
-        vm.startPrank(guardian);
-        vm.expectRevert(IPoolExposureSteward.MismatchingArrayLength.selector);
-        steward.migrateBetweenV3(
-            address(AaveV3Ethereum.POOL),
-            address(AaveV3EthereumEtherFi.POOL),
-            underlyings,
-            amounts
-        );
     }
 
     function test_success() public {
@@ -319,49 +279,18 @@ contract Function_migrateBetweenV3 is PoolExposureStewardTest {
         );
         vm.stopPrank();
     }
-
-    function test_success_arrays() public {
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 1_000e6;
-        address[] memory underlyings = new address[](1);
-        underlyings[0] = AaveV3EthereumAssets.USDC_UNDERLYING;
-
-        uint256 balanceBefore = IERC20(AaveV3EthereumAssets.USDC_A_TOKEN)
-            .balanceOf(address(AaveV3Ethereum.COLLECTOR));
-        uint256 balanceBeforeEtherFi = IERC20(
-            AaveV3EthereumEtherFiAssets.USDC_A_TOKEN
-        ).balanceOf(address(AaveV3Ethereum.COLLECTOR));
-
-        vm.startPrank(guardian);
-
-        steward.migrateBetweenV3(
-            address(AaveV3Ethereum.POOL),
-            address(AaveV3EthereumEtherFi.POOL),
-            underlyings,
-            amounts
-        );
-
-        assertEq(
-            IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(
-                address(AaveV3Ethereum.COLLECTOR)
-            ),
-            balanceBefore - 1_000e6
-        );
-        assertEq(
-            IERC20(AaveV3EthereumEtherFiAssets.USDC_A_TOKEN).balanceOf(
-                address(AaveV3Ethereum.COLLECTOR)
-            ),
-            balanceBeforeEtherFi + 1_000e6
-        );
-        vm.stopPrank();
-    }
 }
 
 contract Function_withdrawV3 is PoolExposureStewardTest {
     function test_revertsIf_notOwnerOrGuardian() public {
         vm.startPrank(alice);
 
-        vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector,
+                alice
+            )
+        );
         steward.withdrawV3(
             address(AaveV3Ethereum.POOL),
             AaveV3EthereumAssets.USDC_UNDERLYING,
@@ -407,7 +336,12 @@ contract Function_withdrawV2 is PoolExposureStewardTest {
     function test_revertsIf_notOwnerOrGuardian() public {
         vm.startPrank(alice);
 
-        vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector,
+                alice
+            )
+        );
         steward.withdrawV2(
             address(AaveV2Ethereum.POOL),
             AaveV3EthereumAssets.USDC_UNDERLYING,
@@ -455,7 +389,12 @@ contract Function_approvePool is PoolExposureStewardTest {
     function test_revertsIf_notOwner() public {
         vm.startPrank(alice);
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                alice
+            )
+        );
         steward.approvePool(address(AaveV3Ethereum.POOL), true);
         vm.stopPrank();
     }
@@ -486,7 +425,12 @@ contract Function_revokePool is PoolExposureStewardTest {
     function test_revertsIf_notOwner() public {
         vm.startPrank(alice);
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                alice
+            )
+        );
         steward.revokePool(address(AaveV3Ethereum.POOL), true);
         vm.stopPrank();
     }

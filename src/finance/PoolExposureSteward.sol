@@ -5,6 +5,7 @@ import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 import {IPoolExposureSteward} from "./interfaces/IPoolExposureSteward.sol";
 
@@ -13,6 +14,9 @@ import {IPoolExposureSteward} from "./interfaces/IPoolExposureSteward.sol";
  * @author luigy-lemon  (Karpatkey)
  * @author efecarranza  (Tokenlogic)
  * @notice Manages deposits, withdrawals, and asset migrations between Aave V2 and Aave V3 assets held in the Collector.
+ *
+ * The contract inherits from `Multicall`. Using the `multicall` function from this contract
+ * multiple operations can be bundled into a single transaction.
  *
  * -- Security Considerations
  *
@@ -29,9 +33,10 @@ import {IPoolExposureSteward} from "./interfaces/IPoolExposureSteward.sol";
  * All token interactions start and end on the Collector, so no funds ever leave the DAO possession at any point in time.
  */
 contract PoolExposureSteward is
+    IPoolExposureSteward,
     OwnableWithGuardian,
     Rescuable,
-    IPoolExposureSteward
+    Multicall
 {
     using CU for ICollector;
     using CU for CU.IOInput;
@@ -117,27 +122,6 @@ contract PoolExposureSteward is
     }
 
     /// @inheritdoc IPoolExposureSteward
-    function migrateV2toV3(
-        address v2Pool,
-        address v3Pool,
-        address[] calldata underlyings,
-        uint256[] calldata amounts
-    ) external onlyOwnerOrGuardian {
-        _validateV2Pool(v2Pool);
-        _validateV3Pool(v3Pool);
-
-        uint256 underlyingsLength = underlyings.length;
-
-        if (underlyingsLength != amounts.length) {
-            revert MismatchingArrayLength();
-        }
-
-        for (uint256 i; i < underlyingsLength; ++i) {
-            _migrateV2toV3(v2Pool, v3Pool, underlyings[i], amounts[i]);
-        }
-    }
-
-    /// @inheritdoc IPoolExposureSteward
     function migrateBetweenV3(
         address fromPool,
         address toPool,
@@ -147,27 +131,6 @@ contract PoolExposureSteward is
         _validateV3Pool(fromPool);
         _validateV3Pool(toPool);
         _migrateBetweenV3(fromPool, toPool, underlying, amount);
-    }
-
-    /// @inheritdoc IPoolExposureSteward
-    function migrateBetweenV3(
-        address fromPool,
-        address toPool,
-        address[] calldata underlyings,
-        uint256[] calldata amounts
-    ) external onlyOwnerOrGuardian {
-        _validateV3Pool(fromPool);
-        _validateV3Pool(toPool);
-
-        uint256 underlyingsLength = underlyings.length;
-
-        if (underlyingsLength != amounts.length) {
-            revert MismatchingArrayLength();
-        }
-
-        for (uint256 i; i < underlyingsLength; ++i) {
-            _migrateBetweenV3(fromPool, toPool, underlyings[i], amounts[i]);
-        }
     }
 
     /// DAO Actions

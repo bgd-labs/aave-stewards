@@ -74,18 +74,6 @@ interface IPoolExposureSteward {
         uint256 amount
     ) external;
 
-    /// @notice Migrates specified amounts of various reserve tokens from Aave V2 to Aave V3
-    /// @param v2Pool The address of the origin V2 Pool
-    /// @param v3Pool The address of the destination V3 Pool
-    /// @param underlyings Array with the addresses of the reserve tokens
-    /// @param amounts Array with the amounts of the reserve tokens to migrate
-    function migrateV2toV3(
-        address v2Pool,
-        address v3Pool,
-        address[] calldata underlyings,
-        uint256[] calldata amounts
-    ) external;
-
     /// @notice Migrates a specified amount of a reserve token from an Aave V3 instance to another
     /// @param fromPool The address of the origin V3 Pool
     /// @param toPool The address of the destination V3 Pool
@@ -96,18 +84,6 @@ interface IPoolExposureSteward {
         address toPool,
         address underlying,
         uint256 amount
-    ) external;
-
-    /// @notice Migrates a specified amount of a reserve token from an Aave V3 instance to another
-    /// @param fromPool The address of the origin V3 Pool
-    /// @param toPool The address of the destination V3 Pool
-    /// @param underlyings Array with the addresses of the reserve tokens
-    /// @param amounts Array with the amounts of the reserve tokens to migrate
-    function migrateBetweenV3(
-        address fromPool,
-        address toPool,
-        address[] calldata underlyings,
-        uint256[] calldata amounts
     ) external;
 
     /// @notice Approves the permission to use a new pool
