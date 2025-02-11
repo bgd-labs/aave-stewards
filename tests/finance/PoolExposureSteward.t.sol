@@ -312,9 +312,25 @@ contract Function_revokePool is PoolExposureStewardTest {
 }
 
 contract Function_emergencyTokenTransfer is PoolExposureStewardTest {
-  function test_revertsIf_invalidCaller() public {
-    vm.expectRevert(IRescuable.OnlyRescueGuardian.selector);
-    steward.emergencyTokenTransfer(AaveV2EthereumAssets.BAL_UNDERLYING, address(AaveV2Ethereum.COLLECTOR), 1_000e6);
+  function test_successful_permissionless() public {
+    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), 0);
+
+    uint256 aaveAmount = 1_000e18;
+
+    deal(AaveV2EthereumAssets.AAVE_UNDERLYING, address(steward), aaveAmount);
+
+    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), aaveAmount);
+
+    uint256 initialCollectorAaveBalance =
+      IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR));
+
+    steward.rescueToken(AaveV2EthereumAssets.AAVE_UNDERLYING);
+
+    assertEq(
+      IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR)),
+      initialCollectorAaveBalance + aaveAmount
+    );
+    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), 0);
   }
 
   function test_successful_governanceCaller() public {
@@ -326,17 +342,42 @@ contract Function_emergencyTokenTransfer is PoolExposureStewardTest {
 
     assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), aaveAmount);
 
-    uint256 initialCollectorUsdcBalance =
+    uint256 initialCollectorAaveBalance =
       IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR));
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    steward.emergencyTokenTransfer(AaveV2EthereumAssets.AAVE_UNDERLYING, address(AaveV2Ethereum.COLLECTOR), aaveAmount);
+    steward.rescueToken(AaveV2EthereumAssets.AAVE_UNDERLYING);
     vm.stopPrank();
 
     assertEq(
       IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR)),
-      initialCollectorUsdcBalance + aaveAmount
+      initialCollectorAaveBalance + aaveAmount
     );
     assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), 0);
+  }
+
+  function test_rescueEth() public {
+    uint256 mintAmount = 1_000_000e18;
+    deal(address(steward), mintAmount);
+
+    uint256 collectorBalanceBefore = address(AaveV2Ethereum.COLLECTOR).balance;
+
+    steward.rescueEth();
+
+    uint256 collectorBalanceAfter = address(AaveV2Ethereum.COLLECTOR).balance;
+
+    assertEq(collectorBalanceAfter - collectorBalanceBefore, mintAmount);
+    assertEq(address(steward).balance, 0);
+  }
+}
+
+contract Function_maxRescue is PoolExposureStewardTest {
+  function test_maxRescue() public {
+    assertEq(steward.maxRescue(AaveV3EthereumAssets.USDC_UNDERLYING), 0);
+
+    uint256 mintAmount = 1_000_000e18;
+    deal(AaveV3EthereumAssets.USDC_UNDERLYING, address(steward), mintAmount);
+
+    assertEq(steward.maxRescue(AaveV3EthereumAssets.USDC_UNDERLYING), mintAmount);
   }
 }

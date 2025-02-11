@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
-import {Rescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
@@ -32,7 +32,7 @@ import {IPoolExposureSteward} from "./interfaces/IPoolExposureSteward.sol";
  * While the permitted Service Provider will have full control over the funds, the allowed actions are limited by the contract itself.
  * All token interactions start and end on the Collector, so no funds ever leave the DAO possession at any point in time.
  */
-contract PoolExposureSteward is IPoolExposureSteward, OwnableWithGuardian, Rescuable, Multicall {
+contract PoolExposureSteward is IPoolExposureSteward, OwnableWithGuardian, RescuableBase, Multicall {
   using CU for ICollector;
   using CU for CU.IOInput;
 
@@ -67,22 +67,21 @@ contract PoolExposureSteward is IPoolExposureSteward, OwnableWithGuardian, Rescu
   function depositV3(address pool, address reserve, uint256 amount) external onlyOwnerOrGuardian {
     _validateV3Pool(pool);
 
-    CU.depositToV3(COLLECTOR, CU.IOInput({pool: pool, underlying: reserve, amount: amount}));
+    COLLECTOR.depositToV3(CU.IOInput({pool: pool, underlying: reserve, amount: amount}));
   }
 
   /// @inheritdoc IPoolExposureSteward
   function withdrawV3(address pool, address reserve, uint256 amount) external onlyOwnerOrGuardian {
     _validateV3Pool(pool);
 
-    CU.IOInput memory withdrawData = CU.IOInput(pool, reserve, amount);
-    CU.withdrawFromV3(COLLECTOR, withdrawData, address(COLLECTOR));
+    COLLECTOR.withdrawFromV3(CU.IOInput(pool, reserve, amount), address(COLLECTOR));
   }
 
   /// @inheritdoc IPoolExposureSteward
   function withdrawV2(address pool, address underlying, uint256 amount) external onlyOwnerOrGuardian {
     _validateV2Pool(pool);
 
-    CU.withdrawFromV2(COLLECTOR, CU.IOInput(pool, underlying, amount), address(COLLECTOR));
+    COLLECTOR.withdrawFromV2(CU.IOInput(pool, underlying, amount), address(COLLECTOR));
   }
 
   /// @inheritdoc IPoolExposureSteward
@@ -117,14 +116,19 @@ contract PoolExposureSteward is IPoolExposureSteward, OwnableWithGuardian, Rescu
     _revokePool(pool, isVersion3);
   }
 
-  /// @inheritdoc Rescuable
-  function whoCanRescue() public view override returns (address) {
-    return owner();
+  /// @inheritdoc IPoolExposureSteward
+  function rescueToken(address token) external {
+    _emergencyTokenTransfer(token, address(COLLECTOR), type(uint256).max);
+  }
+
+  /// @inheritdoc IPoolExposureSteward
+  function rescueEth() external {
+    _emergencyEtherTransfer(address(COLLECTOR), address(this).balance);
   }
 
   /// @inheritdoc IRescuableBase
-  function maxRescue(address) public pure override(RescuableBase, IRescuableBase) returns (uint256) {
-    return type(uint256).max;
+  function maxRescue(address token) public view override(RescuableBase) returns (uint256) {
+    return IERC20(token).balanceOf(address(this));
   }
 
   /// Logic
@@ -144,26 +148,26 @@ contract PoolExposureSteward is IPoolExposureSteward, OwnableWithGuardian, Rescu
 
   /// @dev Internal function to perform migration
   function _migrateV2toV3(address v2Pool, address v3Pool, address underlying, uint256 amount) internal {
-    uint256 withdrawnAmt = CU.withdrawFromV2(COLLECTOR, CU.IOInput(v2Pool, underlying, amount), address(COLLECTOR));
+    uint256 withdrawnAmt = COLLECTOR.withdrawFromV2(CU.IOInput(v2Pool, underlying, amount), address(COLLECTOR));
 
-    CU.depositToV3(COLLECTOR, CU.IOInput(v3Pool, underlying, withdrawnAmt));
+    COLLECTOR.depositToV3(CU.IOInput(v3Pool, underlying, withdrawnAmt));
   }
 
   /// @dev Internal function to migrate between V3 pools
   function _migrateBetweenV3(address fromPool, address toPool, address underlying, uint256 amount) internal {
-    uint256 withdrawnAmt = CU.withdrawFromV3(COLLECTOR, CU.IOInput(fromPool, underlying, amount), address(COLLECTOR));
+    uint256 withdrawnAmt = COLLECTOR.withdrawFromV3(CU.IOInput(fromPool, underlying, amount), address(COLLECTOR));
 
-    CU.depositToV3(COLLECTOR, CU.IOInput(toPool, underlying, withdrawnAmt));
+    COLLECTOR.depositToV3(CU.IOInput(toPool, underlying, withdrawnAmt));
   }
 
   /// @dev Internal function to approve an Aave V3 Pool instance
   function _revokePool(address pool, bool isVersion3) internal {
     if (isVersion3) {
-      if (approvedV3Pools[pool] == false) revert UnrecognizedPool();
+      if (!approvedV3Pools[pool]) revert UnrecognizedPool();
       approvedV3Pools[pool] = false;
       emit RevokedV3Pool(pool);
     } else {
-      if (approvedV2Pools[pool] == false) revert UnrecognizedPool();
+      if (!approvedV2Pools[pool]) revert UnrecognizedPool();
       approvedV2Pools[pool] = false;
       emit RevokedV2Pool(pool);
     }
@@ -171,11 +175,11 @@ contract PoolExposureSteward is IPoolExposureSteward, OwnableWithGuardian, Rescu
 
   /// @dev Internal function to validate if an Aave V3 Pool instance has been approved
   function _validateV3Pool(address pool) internal view {
-    if (approvedV3Pools[pool] == false) revert UnrecognizedPool();
+    if (!approvedV3Pools[pool]) revert UnrecognizedPool();
   }
 
   /// @dev Internal function to validate if an Aave V2 Pool instance has been approved
   function _validateV2Pool(address pool) internal view {
-    if (approvedV2Pools[pool] == false) revert UnrecognizedPool();
+    if (!approvedV2Pools[pool]) revert UnrecognizedPool();
   }
 }

@@ -81,4 +81,11 @@ interface IPoolExposureSteward {
   /// @param pool Address of the Pool to remove
   /// @param version3 True if new pool is a V3 instance
   function revokePool(address pool, bool version3) external;
+
+  /// @notice Rescues the specified token back to the Collector
+  /// @param token The address of the ERC20 token to rescue
+  function rescueToken(address token) external;
+
+  /// @notice Rescues ETH from the contract back to the Collector
+  function rescueEth() external;
 }
