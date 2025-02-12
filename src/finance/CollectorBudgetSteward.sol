@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
 
@@ -16,6 +17,9 @@ import {ICollectorBudgetSteward} from "./interfaces/ICollectorBudgetSteward.sol"
  * The budget is provided per token.
  * The budgets must be reset via governance once expired (or as needed for sizeable transactions).
  *
+ * The contract inherits from `Multicall`. Using the `multicall` function from this contract
+ * multiple operations can be bundled into a single transaction.
+ *
  * The funds can only be received by governance approved addresses. An example scenario is as follows: the DAO approved 1M GHO, and 5 addresses.
  * The stewards then create a stream to a service provider for 500k GHO, transfer 10k GHO for incentives, and 2k GHO for gas-refunds to providers.
  * The stewards then have 488k GHO at their disposal. A DAO controller multi-sig can also be a beneficiary to handle smaller payments such as
@@ -26,7 +30,7 @@ import {ICollectorBudgetSteward} from "./interfaces/ICollectorBudgetSteward.sol"
  * The owner will always be the respective network Short Executor (governance).
  * The guardian role will be given to a Financial Service provider of the DAO.
  */
-contract CollectorBudgetSteward is OwnableWithGuardian, ICollectorBudgetSteward {
+contract CollectorBudgetSteward is ICollectorBudgetSteward, OwnableWithGuardian, Multicall {
   using CU for ICollector;
   using CU for CU.IOInput;
   using CU for CU.CreateStreamInput;
@@ -40,9 +44,9 @@ contract CollectorBudgetSteward is OwnableWithGuardian, ICollectorBudgetSteward 
   /// @inheritdoc ICollectorBudgetSteward
   mapping(address token => uint256 budget) public tokenBudget;
 
-  constructor(address _owner, address _guardian, address collector) {
-    _transferOwnership(_owner);
-    _updateGuardian(_guardian);
+  constructor(address initialOwner, address initialGuardian, address collector)
+    OwnableWithGuardian(initialOwner, initialGuardian)
+  {
     COLLECTOR = ICollector(collector);
   }
 
@@ -70,10 +74,7 @@ contract CollectorBudgetSteward is OwnableWithGuardian, ICollectorBudgetSteward 
 
     uint256 duration = stream.end - stream.start;
 
-    CU.CreateStreamInput memory utilsData =
-      CU.CreateStreamInput(stream.token, to, stream.amount, stream.start, duration);
-
-    CU.stream(COLLECTOR, utilsData);
+    COLLECTOR.stream(CU.CreateStreamInput(stream.token, to, stream.amount, stream.start, duration));
   }
 
   /// @inheritdoc ICollectorBudgetSteward

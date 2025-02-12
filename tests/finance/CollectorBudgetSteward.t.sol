@@ -2,8 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
-import {Ownable} from "solidity-utils/contracts/oz-common/Ownable.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
 import {GovernanceV3Ethereum} from "aave-address-book/GovernanceV3Ethereum.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
 import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
@@ -11,6 +12,10 @@ import {CollectorUtils} from "aave-helpers/src/CollectorUtils.sol";
 import {ICollector} from "aave-address-book/common/ICollector.sol";
 
 import {CollectorBudgetSteward, ICollectorBudgetSteward} from "src/finance/CollectorBudgetSteward.sol";
+
+interface TempCollector {
+  function grantRole(bytes32 role, address account) external;
+}
 
 /**
  * Helper contract to mock price feed calls
@@ -62,7 +67,7 @@ contract CollectorBudgetStewardTest is Test {
   CollectorBudgetSteward public steward;
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("mainnet"), 21580838); // https://etherscan.io/block/21580838
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 21819625); // https://etherscan.io/block/21819625
     steward =
       new CollectorBudgetSteward(GovernanceV3Ethereum.EXECUTOR_LVL_1, guardian, address(AaveV3Ethereum.COLLECTOR));
 
@@ -73,9 +78,8 @@ contract CollectorBudgetStewardTest is Test {
     vm.label(address(steward), "CollectorBudgetSteward");
 
     vm.startPrank(EXECUTOR);
-    AaveV3Ethereum.COLLECTOR.setFundsAdmin(address(steward));
+    TempCollector(address(AaveV3Ethereum.COLLECTOR)).grantRole(bytes32("FUNDS_ADMIN"), address(steward)); // TODO: Remove once aave-address-book is updated
     Ownable(MiscEthereum.AAVE_SWAPPER).transferOwnership(address(steward));
-
     vm.stopPrank();
 
     deal(AaveV3EthereumAssets.USDC_UNDERLYING, address(AaveV3Ethereum.COLLECTOR), 1_000_000e6);
@@ -86,7 +90,7 @@ contract Function_approve is CollectorBudgetStewardTest {
   function test_revertsIf_notOwnerOrQuardian() public {
     vm.startPrank(alice);
 
-    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
     steward.approve(AaveV3EthereumAssets.USDC_UNDERLYING, alice, 1_000e6);
     vm.stopPrank();
   }
@@ -149,7 +153,7 @@ contract Function_transfer is CollectorBudgetStewardTest {
   function test_revertsIf_notOwnerOrQuardian() public {
     vm.startPrank(alice);
 
-    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
     steward.transfer(AaveV3EthereumAssets.USDC_UNDERLYING, alice, 1_000e6);
     vm.stopPrank();
   }
@@ -215,7 +219,7 @@ contract Function_createStream is CollectorBudgetStewardTest {
 
     vm.startPrank(alice);
 
-    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
     steward.createStream(alice, data);
     vm.stopPrank();
   }
@@ -314,7 +318,7 @@ contract Function_cancelStream is CollectorBudgetStewardTest {
   function test_revertsIf_notOwnerOrQuardian() public {
     vm.startPrank(alice);
 
-    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
     steward.cancelStream(STREAM_ID);
     vm.stopPrank();
   }
@@ -332,7 +336,7 @@ contract Function_increaseBudget is CollectorBudgetStewardTest {
   function test_revertsIf_notOwner() public {
     vm.startPrank(alice);
 
-    vm.expectRevert("Ownable: caller is not the owner");
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
     steward.increaseBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
     vm.stopPrank();
   }
@@ -354,7 +358,7 @@ contract Function_decreaseBudget is CollectorBudgetStewardTest {
   function test_revertsIf_notOwner() public {
     vm.startPrank(alice);
 
-    vm.expectRevert("Ownable: caller is not the owner");
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
     steward.decreaseBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
     vm.stopPrank();
   }
@@ -392,7 +396,7 @@ contract Function_setWhitelistedReceiver is CollectorBudgetStewardTest {
   function test_revertsIf_notOwner() public {
     vm.startPrank(alice);
 
-    vm.expectRevert("Ownable: caller is not the owner");
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
     steward.setWhitelistedReceiver(alice);
     vm.stopPrank();
   }
