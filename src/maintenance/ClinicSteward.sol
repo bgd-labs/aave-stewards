@@ -65,7 +65,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   /* CONSTRUCTOR */
 
   constructor(address pool, address collector, address admin, address cleanupRoleRecipient) {
-    if (pool == address(0) || collector == address(0)) {
+    if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
       revert ZeroAddress();
     }
 
@@ -87,7 +87,9 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     _pullFundsAndApprove(asset, totalDebtAmount, useATokens);
 
     for (uint256 i = 0; i < users.length; i++) {
-      POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
+      if (debtAmounts[i] != 0) {
+        POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
+      }
     }
 
     _transferExcessToCollector(asset);
@@ -105,13 +107,13 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     _pullFundsAndApprove(debtAsset, maxDebtAmount, useAToken);
 
     for (uint256 i = 0; i < users.length; i++) {
-      POOL.liquidationCall({
+      try POOL.liquidationCall({
         collateralAsset: collateralAsset,
         debtAsset: debtAsset,
         user: users[i],
         debtToCover: type(uint256).max,
         receiveAToken: true
-      });
+      }) {} catch {}
     }
 
     // the excess is always in the underlying
@@ -179,7 +181,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
         DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
 
         if (userConfiguration.isUsingAsCollateralAny()) {
-          revert UserHasSomeCollateral(user);
+          continue;
         }
       }
 
