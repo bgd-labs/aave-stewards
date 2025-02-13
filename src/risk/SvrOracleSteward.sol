@@ -7,6 +7,12 @@ import {AggregatorInterface} from "aave-v3-origin/contracts/dependencies/chainli
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 
 /**
+ * @title SvrOracleSteward
+ * @author BGD Labs
+ * @notice This contract helps with the configuration of SvrOracles.
+ * As svrOracles are a rather new development that potentially alters the oracle mechanics on the aave protocol,
+ * the idea is to slowly enable the feeds one by one, while also maintainging the ability to swap back in extreme situations.
+ *
  * --- Security considerations
  *
  * The contract requires the AssetListing or PoolAdmin role in order to be able to replace oracles.
@@ -106,8 +112,7 @@ contract SvrOracleSteward is OwnableWithGuardian {
   }
 
   /**
-   *
-   *
+   * @notice configures a new svrOracle for a specified asset.
    */
   function _configureOracle(address asset, address svrOracle) internal {
     if (asset == address(0) || svrOracle == address(0)) revert ZeroAddress();
