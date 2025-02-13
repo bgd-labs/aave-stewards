@@ -296,12 +296,12 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     }
   }
 
-  function test_reverts_getBadDebtAmount_userHasSomeCollateral() public {
-    vm.expectRevert(
-      abi.encodePacked(IClinicSteward.UserHasSomeCollateral.selector, uint256(uint160(usersWithGoodDebt[0])))
-    );
-
-    steward.getBadDebtAmount(assetUnderlying, usersWithGoodDebt);
+  function test_userHasSomeCollateral_returns_zero() public view {
+    (uint256 totalAmount, uint256[] memory amounts) = steward.getBadDebtAmount(assetUnderlying, usersWithGoodDebt);
+    assertEq(totalAmount, 0);
+    for (uint256 i = 0; i < amounts.length; i++) {
+      assertEq(amounts[i], 0);
+    }
   }
 
   function test_maxRescue() public {

@@ -8,13 +8,6 @@ import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuab
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 interface IClinicSteward is IRescuableBase, IAccessControl {
-  /* ERRORS */
-
-  /// @notice Thrown when a user has some collateral. To repay a bad debt,
-  ///         a user should have no collateral.
-  /// @param user The address of the user
-  error UserHasSomeCollateral(address user);
-
   /// @notice Thrown when passed address is zero
   error ZeroAddress();
 
