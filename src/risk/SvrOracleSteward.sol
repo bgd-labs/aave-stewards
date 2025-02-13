@@ -20,11 +20,17 @@ import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/Ownab
  *
  * The owner role which will be assigned to the governance short executor can list new svrOracles.
  * The guardian role can enable and disable oracles configured by the governance.
+ *
+ * Limitations:
+ * If a svrOracle oracle is changed via governance, omitting the ScrOracleSteward, the steward might be able to:
+ * - disable back to a "wrong"(old) oracle
+ * - reenable the svr oracle
+ * Therefore, governance proposals will need to `resetConfiguration(asset)` to ensure it cannot be reenabled.
  */
 contract SvrOracleSteward is OwnableWithGuardian {
   IPoolAddressesProvider immutable POOL_ADDRESSES_PROVIDER;
 
-  event SvrOracleRegistered(address asset, address svrOracle);
+  event SvrOracleChanged(address asset, address svrOracle);
 
   error OracleDeviation(int256 oldPrice, int256 newPrice);
   error CannotReplaceOracleWithItself();
@@ -59,6 +65,16 @@ contract SvrOracleSteward is OwnableWithGuardian {
    */
   function configureOracle(AssetOracle calldata configInput) external onlyOwner {
     _configureOracle(configInput.asset, configInput.svrOracle);
+  }
+
+  /**
+   * @notice Resets the configuration of an asset.
+   * @param asset Address of the asset configruation to reset.
+   */
+  function resetConfiguration(address asset) external onlyOwner {
+    _svrOracles[asset] = address(0);
+    _oracleCache[asset] = address(0);
+    emit SvrOracleChanged(asset, address(0));
   }
 
   /**
@@ -118,6 +134,6 @@ contract SvrOracleSteward is OwnableWithGuardian {
     if (asset == address(0) || svrOracle == address(0)) revert ZeroAddress();
     if (AggregatorInterface(svrOracle).decimals() != 8) revert InvalidOracleDecimals();
     _svrOracles[asset] = svrOracle;
-    emit SvrOracleRegistered(asset, svrOracle);
+    emit SvrOracleChanged(asset, svrOracle);
   }
 }
