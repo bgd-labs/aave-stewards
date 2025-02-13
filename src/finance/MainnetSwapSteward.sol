@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
+import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {AaveSwapper} from "aave-helpers/src/swaps/AaveSwapper.sol";
 import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
 import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
@@ -18,6 +19,9 @@ import {IMainnetSwapSteward} from "src/finance/interfaces/IMainnetSwapSteward.so
  * Funds must be present in the AaveSwapper in order for them to be executed.
  * The tokens that are to be swapped from/to are to be pre-approved via governance.
  *
+ * The contract inherits from `Multicall`. Using the `multicall` function from this contract
+ * multiple operations can be bundled into a single transaction.
+ *
  * -- Security Considerations
  * Having previously set and validated oracles avoids mistakes that are easy to make when passing the necessary parameters to swap.
  *
@@ -26,8 +30,21 @@ import {IMainnetSwapSteward} from "src/finance/interfaces/IMainnetSwapSteward.so
  * The owner will always be the respective network Short Executor (governance).
  * The guardian role will be given to a Financial Service provider of the DAO.
  *
+ * -- Swap Pairs Information
+ *
+ * The swaps executed by this contract will be performed at the discretion of the finance stewards in order to
+ * achieve different matters on behalf of the DAO.
+ *
+ * GHO Price Stability: Swap stables for GHO in order to regain the price objective
+ * Merit, Streams and similar: Swap stables for GHO in order to have funding for these activities
+ * Long-tail asset exposure reduction: Swap long-tail assets to stablecoins or WETH in order to reduce exposure and
+ * or to consolidate the DAO's holdings
+ * LSTs: Swap underlying tokens into LSTs in order to generate yield for the DAO
+ * Majors: Swap wBTC to wETH as part of the treasury strategy
+ *
  */
-contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
+contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multicall {
+  using CU for ICollector;
   using CU for CU.SwapInput;
 
   /// @inheritdoc IMainnetSwapSteward
@@ -46,58 +63,62 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
   address public priceChecker;
 
   /// @inheritdoc IMainnetSwapSteward
-  mapping(address token => bool isApproved) public swapApprovedToken;
+  mapping(address fromToken => mapping(address toToken => bool isApproved)) public swapApprovedToken;
 
   /// @inheritdoc IMainnetSwapSteward
   mapping(address token => address oracle) public priceOracle;
 
   constructor(
-    address _owner,
-    address _guardian,
-    address _collector,
-    address _swapper,
-    address _milkman,
-    address _priceChecker
-  ) {
-    _transferOwnership(_owner);
-    _updateGuardian(_guardian);
-    _setMilkman(_milkman);
-    _setPriceChecker(_priceChecker);
+    address initialOwner,
+    address initialGuardian,
+    address collector,
+    address swapper,
+    address initialMilkman,
+    address initialPriceChecker
+  ) OwnableWithGuardian(initialOwner, initialGuardian) {
+    _setMilkman(initialMilkman);
+    _setPriceChecker(initialPriceChecker);
 
-    COLLECTOR = ICollector(_collector);
-    SWAPPER = AaveSwapper(_swapper);
+    COLLECTOR = ICollector(collector);
+    SWAPPER = AaveSwapper(swapper);
   }
 
   /// @inheritdoc IMainnetSwapSteward
-  function tokenSwap(address sellToken, uint256 amount, address buyToken, uint256 slippage)
-    external
-    onlyOwnerOrGuardian
-  {
-    _validateSwap(sellToken, amount, buyToken, slippage);
+  function tokenSwap(address fromToken, address toToken, uint256 amount, uint256 slippage) external onlyOwnerOrGuardian {
+    address fromOracle = priceOracle[fromToken];
+    address toOracle = priceOracle[toToken];
 
-    CU.SwapInput memory swapData = CU.SwapInput(
-      milkman, priceChecker, sellToken, buyToken, priceOracle[sellToken], priceOracle[buyToken], amount, slippage
+    _validateSwap(fromToken, toToken, fromOracle, toOracle, amount, slippage);
+
+    COLLECTOR.swap(
+      address(SWAPPER), CU.SwapInput(milkman, priceChecker, fromToken, toToken, fromOracle, toOracle, amount, slippage)
     );
-
-    CU.swap(COLLECTOR, address(SWAPPER), swapData);
   }
 
   /// @inheritdoc IMainnetSwapSteward
-  function setSwappableToken(address token, address priceFeedUSD) external onlyOwner {
-    if (priceFeedUSD == address(0)) revert InvalidZeroAddress();
+  function setSwappablePair(address fromToken, address toToken) external onlyOwner {
+    if (fromToken == toToken) revert UnrecognizedTokenSwap();
 
-    swapApprovedToken[token] = true;
-    priceOracle[token] = priceFeedUSD;
+    swapApprovedToken[fromToken][toToken] = true;
+
+    emit ApprovedToken(fromToken, toToken);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function setTokenOracle(address token, address oracle) external onlyOwner {
+    if (oracle == address(0)) revert InvalidZeroAddress();
 
     // Validate oracle has necessary functions
-    if (IAggregatorInterface(priceFeedUSD).decimals() != 8) {
+    if (IAggregatorInterface(oracle).decimals() != 8) {
       revert PriceFeedIncompatibleDecimals();
     }
-    if (IAggregatorInterface(priceFeedUSD).latestAnswer() == 0) {
+    if (IAggregatorInterface(oracle).latestAnswer() == 0) {
       revert PriceFeedInvalidAnswer();
     }
 
-    emit ApprovedToken(token, priceFeedUSD);
+    priceOracle[token] = oracle;
+
+    emit SetTokenOracle(token, oracle);
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -129,19 +150,22 @@ contract MainnetSwapSteward is OwnableWithGuardian, IMainnetSwapSteward {
   }
 
   /// @dev Internal function to validate a swap's parameters
-  function _validateSwap(address sellToken, uint256 amountIn, address buyToken, uint256 slippage) internal view {
+  function _validateSwap(
+    address fromToken,
+    address toToken,
+    address fromOracle,
+    address toOracle,
+    uint256 amountIn,
+    uint256 slippage
+  ) internal view {
     if (amountIn == 0) revert InvalidZeroAmount();
-
-    if (!swapApprovedToken[sellToken] || !swapApprovedToken[buyToken]) {
-      revert UnrecognizedToken();
-    }
-
     if (slippage > MAX_SLIPPAGE) revert InvalidSlippage();
 
-    if (
-      IAggregatorInterface(priceOracle[buyToken]).latestAnswer() == 0
-        || IAggregatorInterface(priceOracle[sellToken]).latestAnswer() == 0
-    ) {
+    if (!swapApprovedToken[fromToken][toToken]) {
+      revert UnrecognizedTokenSwap();
+    }
+
+    if (IAggregatorInterface(fromOracle).latestAnswer() == 0 || IAggregatorInterface(toOracle).latestAnswer() == 0) {
       revert PriceFeedInvalidAnswer();
     }
   }

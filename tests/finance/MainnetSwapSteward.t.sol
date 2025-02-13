@@ -2,8 +2,9 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {IERC20} from "solidity-utils/contracts/oz-common/interfaces/IERC20.sol";
-import {Ownable} from "solidity-utils/contracts/oz-common/Ownable.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
 import {GovernanceV3Ethereum} from "aave-address-book/GovernanceV3Ethereum.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
 import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
@@ -11,6 +12,11 @@ import {CollectorUtils} from "aave-helpers/src/CollectorUtils.sol";
 import {ICollector} from "aave-address-book/common/ICollector.sol";
 
 import {MainnetSwapSteward, IMainnetSwapSteward} from "src/finance/MainnetSwapSteward.sol";
+
+// TODO: Remove
+interface TempCollector {
+  function grantRole(bytes32 role, address account) external;
+}
 
 /**
  * @dev Test for SwapSteward contract
@@ -29,7 +35,8 @@ contract MainnetSwapStewardTest is Test {
     address indexed recipient,
     uint256 slippage
   );
-  event ApprovedToken(address indexed token, address indexed oracleUSD);
+  event ApprovedToken(address indexed fromToken, address indexed toToken);
+  event SetTokenOracle(address indexed token, address indexed oracle);
 
   address public constant USDC_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
   address public constant AAVE_PRICE_FEED = 0x547a514d5e3769680Ce22B2361c10Ea13619e8a9;
@@ -46,7 +53,7 @@ contract MainnetSwapStewardTest is Test {
   MainnetSwapSteward public steward;
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("mainnet"), 21580838); // https://etherscan.io/block/21580838
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 21819625); // https://etherscan.io/block/21819625
 
     steward = new MainnetSwapSteward(
       GovernanceV3Ethereum.EXECUTOR_LVL_1,
@@ -64,7 +71,7 @@ contract MainnetSwapStewardTest is Test {
     vm.label(address(steward), "MainnetSwapSteward");
 
     vm.startPrank(EXECUTOR);
-    AaveV3Ethereum.COLLECTOR.setFundsAdmin(address(steward));
+    TempCollector(address(AaveV3Ethereum.COLLECTOR)).grantRole(bytes32("FUNDS_ADMIN"), address(steward)); // TODO: Remove once aave-address-book is updated
     Ownable(MiscEthereum.AAVE_SWAPPER).transferOwnership(address(steward));
 
     vm.stopPrank();
@@ -73,12 +80,12 @@ contract MainnetSwapStewardTest is Test {
   }
 }
 
-contract Function_tokenSwap is MainnetSwapStewardTest {
+contract TokenSwapTest is MainnetSwapStewardTest {
   function test_revertsIf_notOwnerOrQuardian() public {
     vm.startPrank(alice);
 
-    vm.expectRevert("ONLY_BY_OWNER_OR_GUARDIAN");
-    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6, AaveV3EthereumAssets.AAVE_UNDERLYING, 100);
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, alice));
+    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6, 100);
     vm.stopPrank();
   }
 
@@ -86,15 +93,15 @@ contract Function_tokenSwap is MainnetSwapStewardTest {
     vm.startPrank(guardian);
 
     vm.expectRevert(IMainnetSwapSteward.InvalidZeroAmount.selector);
-    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, 0, AaveV3EthereumAssets.AAVE_UNDERLYING, 100);
+    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 0, 100);
     vm.stopPrank();
   }
 
   function test_resvertsIf_unrecognizedToken() public {
     vm.startPrank(guardian);
 
-    vm.expectRevert(IMainnetSwapSteward.UnrecognizedToken.selector);
-    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6, AaveV3EthereumAssets.AAVE_UNDERLYING, 100);
+    vm.expectRevert(IMainnetSwapSteward.UnrecognizedTokenSwap.selector);
+    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6, 100);
     vm.stopPrank();
   }
 
@@ -103,16 +110,29 @@ contract Function_tokenSwap is MainnetSwapStewardTest {
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     vm.expectRevert(IMainnetSwapSteward.PriceFeedInvalidAnswer.selector);
-    steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, mockOracle);
+    steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, mockOracle);
     vm.stopPrank();
+  }
+
+  function test_revertsIf_pairSetNoOracle() public {
+    uint256 slippage = 100;
+
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    steward.setSwappablePair(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING);
+    steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
+
+    vm.startPrank(guardian);
+    vm.expectRevert();
+    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6, slippage);
   }
 
   function test_success() public {
     uint256 slippage = 100;
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
-    steward.setSwappableToken(AaveV3EthereumAssets.AAVE_UNDERLYING, AAVE_PRICE_FEED);
+    steward.setSwappablePair(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING);
+    steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
+    steward.setTokenOracle(AaveV3EthereumAssets.AAVE_UNDERLYING, AAVE_PRICE_FEED);
 
     vm.startPrank(guardian);
     vm.expectEmit(true, true, true, true, address(steward.SWAPPER()));
@@ -127,23 +147,41 @@ contract Function_tokenSwap is MainnetSwapStewardTest {
       slippage
     );
 
-    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6, AaveV3EthereumAssets.AAVE_UNDERLYING, slippage);
+    steward.tokenSwap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6, slippage);
     vm.stopPrank();
   }
 }
 
-contract Function_setSwappableToken is MainnetSwapStewardTest {
+contract SetSwappablePairTest is MainnetSwapStewardTest {
   function test_revertsIf_notOwner() public {
     vm.startPrank(alice);
-    vm.expectRevert("Ownable: caller is not the owner");
-    steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+    steward.setSwappablePair(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING);
     vm.stopPrank();
   }
 
-  function test_resvertsIf_missingPriceFeed() public {
+  function test_resvertsIf_sameToken() public {
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
-    steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, address(0));
+    vm.expectRevert(IMainnetSwapSteward.UnrecognizedTokenSwap.selector);
+    steward.setSwappablePair(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.USDC_UNDERLYING);
+    vm.stopPrank();
+  }
+
+  function test_success() public {
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+
+    vm.expectEmit(true, true, true, true, address(steward));
+    emit ApprovedToken(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING);
+    steward.setSwappablePair(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING);
+    vm.stopPrank();
+  }
+}
+
+contract SetTokenOracleTest is MainnetSwapStewardTest {
+  function test_revertsIf_notOwner() public {
+    vm.startPrank(alice);
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+    steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
     vm.stopPrank();
   }
 
@@ -152,7 +190,7 @@ contract Function_setSwappableToken is MainnetSwapStewardTest {
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     vm.expectRevert();
-    steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, mockOracle);
+    steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, mockOracle);
 
     vm.stopPrank();
   }
@@ -161,15 +199,15 @@ contract Function_setSwappableToken is MainnetSwapStewardTest {
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
 
     vm.expectEmit(true, true, true, true, address(steward));
-    emit ApprovedToken(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
-    steward.setSwappableToken(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
-    vm.stopPrank();
+    emit SetTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
+
+    steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
   }
 }
 
 contract SetPriceChecker is MainnetSwapStewardTest {
   function test_revertsIf_invalidCaller() public {
-    vm.expectRevert("Ownable: caller is not the owner");
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
     steward.setPriceChecker(makeAddr("price-checker"));
   }
 
@@ -192,7 +230,7 @@ contract SetPriceChecker is MainnetSwapStewardTest {
 
 contract SetMilkman is MainnetSwapStewardTest {
   function test_revertsIf_invalidCaller() public {
-    vm.expectRevert("Ownable: caller is not the owner");
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
     steward.setMilkman(makeAddr("new-milkman"));
   }
 

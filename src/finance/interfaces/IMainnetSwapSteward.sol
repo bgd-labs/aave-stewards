@@ -20,8 +20,8 @@ interface IMainnetSwapSteward {
   /// @dev Oracle is returning unexpected value
   error PriceFeedInvalidAnswer();
 
-  /// @dev Token has not been previously approved for swapping
-  error UnrecognizedToken();
+  /// @dev Token pair has not been set for swapping
+  error UnrecognizedTokenSwap();
 
   /// @notice Emitted when the Milkman contract address is updated
   /// @param oldAddress The old Milkman instance address
@@ -34,9 +34,14 @@ interface IMainnetSwapSteward {
   event PriceCheckerUpdated(address oldAddress, address newAddress);
 
   /// @notice Emitted when a token is approved for swapping with its corresponding USD oracle
-  /// @param token The address of the token approved for swapping
-  /// @param oracleUSD The address of the oracle providing the USD price feed for the token
-  event ApprovedToken(address indexed token, address indexed oracleUSD);
+  /// @param fromToken The address of the token approved for swapping from
+  /// @param toToken The address of the token approved to swap to
+  event ApprovedToken(address indexed fromToken, address indexed toToken);
+
+  /// @notice Emitted when an oracle address is set for a given token
+  /// @param token The address of the token
+  /// @param oracle The address of the token oracle
+  event SetTokenOracle(address indexed token, address indexed oracle);
 
   /// @notice Returns instance of Aave V3 Collector
   function COLLECTOR() external view returns (ICollector);
@@ -54,19 +59,20 @@ interface IMainnetSwapSteward {
   function priceChecker() external view returns (address);
 
   /// @notice Returns whether token is approved to be swapped from/to
-  /// @param token Address of the token to swap from/to
-  function swapApprovedToken(address token) external view returns (bool);
+  /// @param fromToken Address of the token to swap from
+  /// @param toToken Address of the token to swap to
+  function swapApprovedToken(address fromToken, address toToken) external view returns (bool);
 
   /// @notice Returns address of the Oracle to use for token swaps
   /// @param token Address of the token to swap
   function priceOracle(address token) external view returns (address);
 
   /// @notice Swaps a specified amount of a sell token for a buy token
-  /// @param sellToken The address of the token to sell
+  /// @param fromToken The address of the token to sell
+  /// @param toToken The address of the token to buy
   /// @param amount The amount of the sell token to swap
-  /// @param buyToken The address of the token to buy
   /// @param slippage The slippage allowed in the swap
-  function tokenSwap(address sellToken, uint256 amount, address buyToken, uint256 slippage) external;
+  function tokenSwap(address fromToken, address toToken, uint256 amount, uint256 slippage) external;
 
   /// @notice Sets the address for the MILKMAN used in swaps
   /// @param to The address of MILKMAN
@@ -76,8 +82,13 @@ interface IMainnetSwapSteward {
   /// @param to The address of PRICE_CHECKER
   function setPriceChecker(address to) external;
 
-  /// @notice Sets a token as swappable and provides its price feed address
-  /// @param token The address of the token to set as swappable
-  /// @param priceFeedUSD The address of the price feed for the token
-  function setSwappableToken(address token, address priceFeedUSD) external;
+  /// @notice Sets a token pair as allowed for swapping in from -> to direction only
+  /// @param fromToken The address of the token to swap from
+  /// @param toToken The address of the token to swap to
+  function setSwappablePair(address fromToken, address toToken) external;
+
+  /// @notice Sets a token's Chainlink Oracle (in USD)
+  /// @param token The address of the token
+  /// @param oracle The address of the token oracle
+  function setTokenOracle(address token, address oracle) external;
 }
