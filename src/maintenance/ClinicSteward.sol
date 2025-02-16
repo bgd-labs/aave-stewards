@@ -93,6 +93,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
 
     _transferExcessToCollector(asset);
+    IERC20(asset).forceApprove(address(POOL), 0);
   }
 
   /// @inheritdoc IClinicSteward
@@ -122,6 +123,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     // transfer back liquidated assets
     address collateralAToken = POOL.getReserveAToken(collateralAsset);
     _transferExcessToCollector(collateralAToken);
+    IERC20(debtAsset).forceApprove(address(POOL), 0);
   }
 
   /// @inheritdoc IClinicSteward
