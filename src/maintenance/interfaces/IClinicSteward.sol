@@ -49,6 +49,9 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @notice Rescues the ETH
   function rescueEth() external;
 
+  /// @notice Infinite approves an asset to the pool
+  function renewAllowance(address asset) external;
+
   /* EXTERNAL VIEW FUNCTIONS */
 
   /// @notice Returns the total debt amount and the debt amounts of users
