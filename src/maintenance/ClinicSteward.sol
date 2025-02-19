@@ -131,7 +131,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     _transferExcessToCollector(debtAsset);
 
     // transfer back liquidated assets
-    address collateralAToken = POOL.getReserveAToken(collateralAsset);
+    address collateralAToken = _getAToken(collateralAsset);
     _transferExcessToCollector(collateralAToken);
   }
 
@@ -182,7 +182,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     uint256 totalDebtAmount;
     uint256[] memory debtAmounts = new uint256[](users.length);
 
-    address variableDebtTokenAddress = POOL.getReserveVariableDebtToken(asset);
+    address variableDebtTokenAddress = _getVToken(asset);
 
     address user;
     for (uint256 i = 0; i < users.length; i++) {
@@ -204,7 +204,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
   function _pullFunds(address asset, uint256 amount, bool useAToken) internal {
     if (useAToken) {
-      address aToken = POOL.getReserveAToken(asset);
+      address aToken = _getAToken(asset);
       // 1 wei surplus to account for rounding on multiple operations
       ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 1);
       POOL.withdraw(asset, type(uint256).max, address(this));
@@ -218,5 +218,13 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     if (balanceAfter != 0) {
       IERC20(asset).safeTransfer(COLLECTOR, balanceAfter);
     }
+  }
+
+  function _getAToken(address asset) internal view virtual returns (address) {
+    return POOL.getReserveAToken(asset);
+  }
+
+  function _getVToken(address asset) internal view virtual returns (address) {
+    return POOL.getReserveVariableDebtToken(asset);
   }
 }
