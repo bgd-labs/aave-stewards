@@ -18,7 +18,7 @@ contract SvrOracleStewardBaseTest is Test {
   address guardian = address(1);
 
   function setUp() external {
-    vm.createSelectFork(vm.rpcUrl("mainnet"), 21838335);
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 21882843);
     steward = DeploySvrOracleSteward_Lib._deployMainnet();
     vm.prank(AaveV3Ethereum.ACL_ADMIN);
     AaveV3Ethereum.ACL_MANAGER.addAssetListingAdmin(address(steward));
@@ -48,7 +48,7 @@ contract SvrOracleStewardBaseTest is Test {
   function test_configureOracle() external {
     vm.prank(steward.owner());
     SvrOracleSteward.AssetOracle memory config =
-      SvrOracleSteward.AssetOracle({asset: address(9), svrOracle: address(100)});
+      SvrOracleSteward.AssetOracle({asset: address(9), svrOracle: address(0x270A3a705837e8Ec52C3dECd083bf9796654cb74)});
     steward.configureOracle(config);
   }
 

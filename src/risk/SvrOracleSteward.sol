@@ -87,7 +87,7 @@ contract SvrOracleSteward is OwnableWithGuardian {
     IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
     address currentOracle = oracle.getSourceOfAsset(asset);
     if (svrOracle == currentOracle) revert CannotReplaceOracleWithItself();
-    _ensureNoDeviation(svrOracle, currentOracle);
+    _withinAllowedDeviation(svrOracle, currentOracle);
 
     _oracleCache[asset] = currentOracle;
     address[] memory assets = new address[](1);
@@ -119,12 +119,14 @@ contract SvrOracleSteward is OwnableWithGuardian {
 
   /**
    * @notice While in rare cases the svrOracle might lag behind the vanilla, at least on activation we want to ensure they are in sync.
-   * While this does not guarantee proper functionality it provides some additional assurance.
+   * While this does not guarantee proper functionality it provides some additional assurance on activation.
    */
-  function _ensureNoDeviation(address oldFeed, address newFeed) internal view {
+  function _withinAllowedDeviation(address oldFeed, address newFeed) internal view {
     int256 oldPrice = AggregatorInterface(oldFeed).latestAnswer();
     int256 newPrice = AggregatorInterface(newFeed).latestAnswer();
-    if (oldPrice != newPrice) revert OracleDeviation(oldPrice, newPrice);
+    int256 difference = oldPrice >= newPrice ? oldPrice - newPrice : newPrice - oldPrice;
+    int256 average = (oldPrice + newPrice) / 2;
+    if (difference * 1e4 > average * 10) revert OracleDeviation(oldPrice, newPrice);
   }
 
   /**
