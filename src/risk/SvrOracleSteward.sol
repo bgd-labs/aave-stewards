@@ -126,6 +126,7 @@ contract SvrOracleSteward is OwnableWithGuardian {
     int256 newPrice = AggregatorInterface(newFeed).latestAnswer();
     int256 difference = oldPrice >= newPrice ? oldPrice - newPrice : newPrice - oldPrice;
     int256 average = (oldPrice + newPrice) / 2;
+    // allow deviation of <0.1%
     if (difference * 1e4 > average * 10) revert OracleDeviation(oldPrice, newPrice);
   }
 
