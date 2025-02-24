@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
+import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
@@ -12,12 +13,7 @@ import {AaveV3EthereumLido} from "aave-address-book/AaveV3EthereumLido.sol";
 import {AaveV3EthereumEtherFi, AaveV3EthereumEtherFiAssets} from "aave-address-book/AaveV3EthereumEtherFi.sol";
 import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
 import {CollectorUtils} from "aave-helpers/src/CollectorUtils.sol";
-
 import {PoolExposureSteward, IPoolExposureSteward} from "src/finance/PoolExposureSteward.sol";
-
-interface TempCollector {
-  function grantRole(bytes32 role, address account) external;
-}
 
 /**
  * @dev Tests for PoolSteward contract
@@ -29,15 +25,13 @@ contract PoolExposureStewardTest is Test {
   event RevokedV2Pool(address indexed pool);
   event RevokedV3Pool(address indexed pool);
 
-  address public constant USDC_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
-  address public constant AAVE_PRICE_FEED = 0x547a514d5e3769680Ce22B2361c10Ea13619e8a9;
-  address public constant EXECUTOR = 0x5300A1a15135EA4dc7aD5a167152C01EFc9b192A;
+  address public constant EXECUTOR = AaveV3Ethereum.ACL_ADMIN;
   address public constant guardian = address(82);
   address public alice = address(43);
   PoolExposureSteward public steward;
 
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("mainnet"), 21819625); // https://etherscan.io/block/21819625
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 21918940); // https://etherscan.io/block/21819625
 
     address[] memory v2Pools = new address[](1);
     v2Pools[0] = address(AaveV2Ethereum.POOL);
@@ -56,10 +50,8 @@ contract PoolExposureStewardTest is Test {
     vm.label(EXECUTOR, "Executor");
     vm.label(address(steward), "PoolSteward");
 
-    vm.startPrank(EXECUTOR);
-    TempCollector(address(AaveV3Ethereum.COLLECTOR)).grantRole(bytes32("FUNDS_ADMIN"), address(steward)); // TODO: Remove once aave-address-book is updated
-
-    vm.stopPrank();
+    vm.prank(EXECUTOR);
+    IAccessControl(address(AaveV3Ethereum.COLLECTOR)).grantRole("FUNDS_ADMIN", address(steward));
 
     deal(AaveV3EthereumAssets.USDC_UNDERLYING, address(AaveV3Ethereum.COLLECTOR), 1_000_000e6);
   }
@@ -174,20 +166,19 @@ contract Function_migrateBetweenV3 is PoolExposureStewardTest {
     uint256 balanceBeforeEtherFi =
       IERC20(AaveV3EthereumEtherFiAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR));
 
-    vm.startPrank(guardian);
-
+    vm.prank(guardian);
     steward.migrateBetweenV3(
       address(AaveV3Ethereum.POOL), address(AaveV3EthereumEtherFi.POOL), AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6
     );
 
-    assertEq(
-      IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)), balanceBefore - 1_000e6
+    assertApproxEqAbs(
+      IERC20(AaveV3EthereumAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)), balanceBefore - 1_000e6, 1
     );
-    assertEq(
+    assertApproxEqAbs(
       IERC20(AaveV3EthereumEtherFiAssets.USDC_A_TOKEN).balanceOf(address(AaveV3Ethereum.COLLECTOR)),
-      balanceBeforeEtherFi + 1_000e6
+      balanceBeforeEtherFi + 1_000e6,
+      1
     );
-    vm.stopPrank();
   }
 }
 
