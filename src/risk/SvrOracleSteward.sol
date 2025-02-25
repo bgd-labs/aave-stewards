@@ -5,6 +5,7 @@ import {IAaveOracle} from "aave-v3-origin/contracts/interfaces/IAaveOracle.sol";
 import {IPoolAddressesProvider} from "aave-v3-origin/contracts/interfaces/IPoolAddressesProvider.sol";
 import {AggregatorInterface} from "aave-v3-origin/contracts/dependencies/chainlink/AggregatorInterface.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
+import {ISvrOracleSteward} from "./interfaces/ISvrOracleSteward.sol";
 
 /**
  * @title SvrOracleSteward
@@ -15,37 +16,31 @@ import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/Ownab
  *
  * --- Security considerations
  *
- * The contract requires the AssetListing or PoolAdmin role in order to be able to replace oracles.
+ * The contract requires the "AssetListing" or "PoolAdmin" role in order to be able to replace oracles.
  * Due to the narrow scope of the contract ifself, only oracles can be replaces, no other role permissions can be exercised.
  *
  * The owner role which will be assigned to the governance short executor can list new svrOracles.
  * The guardian role can enable and disable oracles configured by the governance.
  *
- * Limitations:
- * If a svrOracle oracle is changed via governance, omitting the ScrOracleSteward, the steward might be able to:
- * - disable back to a "wrong"(old) oracle
- * - reenable the svr oracle
- * Therefore, governance proposals will need to `resetConfiguration(asset)` to ensure it cannot be reenabled.
+ * While the SvrOracle should report the same price as the current Oracle, currently the Svr is served from a different DON.
+ * In practice this means that there are slight deviations on the oracle prices.
+ * To ensure proper functionality, before activating a Svr it is ensured that the reported price is within narrow bounds (0.1% deviation).
+ *
+ * --- Limitations
+ *
+ * When configuring a svrOracle for an asset, the current oracle is cached.
+ * The system will only allow siwthing between the cached and the svrOracle.
+ * If the oracle changes e.g. via a governanceProposal, the steward will no longer be able to enable the svrOracle.
+ * To resume functionality the svr would need to be reconfigured.
  */
-contract SvrOracleSteward is OwnableWithGuardian {
-  IPoolAddressesProvider immutable POOL_ADDRESSES_PROVIDER;
+contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
+  /// @inheritdoc ISvrOracleSteward
+  IPoolAddressesProvider public immutable POOL_ADDRESSES_PROVIDER;
 
-  event SvrOracleChanged(address asset, address svrOracle);
-
-  error OracleDeviation(int256 oldPrice, int256 newPrice);
-  error CannotReplaceOracleWithItself();
-  error NoSvrOracleConfigured();
-  error NoCachedOracle();
-  error ZeroAddress();
-  error InvalidOracleDecimals();
-
+  // stores the configured svr oracles
   mapping(address asset => address svrOracle) internal _svrOracles;
+  // stores a snapshot of the oracle at configuration time
   mapping(address asset => address cachedOracle) internal _oracleCache;
-
-  struct AssetOracle {
-    address asset;
-    address svrOracle;
-  }
 
   constructor(
     IPoolAddressesProvider addressesProvider,
@@ -59,37 +54,25 @@ contract SvrOracleSteward is OwnableWithGuardian {
     }
   }
 
-  /**
-   * @notice Updates or adds a svrOracle for a selected asset.
-   * @param configInput A configuration input struct containing the asset and svrOracle.
-   */
+  /// @inheritdoc ISvrOracleSteward
+  function getOracleConfig(address asset) external view returns (address, address) {
+    return (_oracleCache[asset], _svrOracles[asset]);
+  }
+
+  /// @inheritdoc ISvrOracleSteward
   function configureOracle(AssetOracle calldata configInput) external onlyOwner {
     _configureOracle(configInput.asset, configInput.svrOracle);
   }
 
-  /**
-   * @notice Resets the configuration of an asset.
-   * @param asset Address of the asset configruation to reset.
-   */
-  function resetConfiguration(address asset) external onlyOwner {
-    _svrOracles[asset] = address(0);
-    _oracleCache[asset] = address(0);
-    emit SvrOracleChanged(asset, address(0));
-  }
-
-  /**
-   * @notice Enables a previously configured svrOracle.
-   * @param asset Address of the asset for which to enable the svrOracle for.
-   */
+  /// @inheritdoc ISvrOracleSteward
   function enableSvrOracle(address asset) external onlyGuardian {
     address svrOracle = _svrOracles[asset];
     if (svrOracle == address(0)) revert NoSvrOracleConfigured();
     IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
     address currentOracle = oracle.getSourceOfAsset(asset);
-    if (svrOracle == currentOracle) revert CannotReplaceOracleWithItself();
+    if (currentOracle == _oracleCache[asset]) revert UnknownOracle();
     _withinAllowedDeviation(svrOracle, currentOracle);
 
-    _oracleCache[asset] = currentOracle;
     address[] memory assets = new address[](1);
     assets[0] = asset;
     address[] memory feeds = new address[](1);
@@ -97,19 +80,15 @@ contract SvrOracleSteward is OwnableWithGuardian {
     oracle.setAssetSources(assets, feeds);
   }
 
-  /**
-   * @notice Disables a previously configured svrOracle.
-   * @param asset Address of the asset for which to enable the svrOracle for.
-   */
+  /// @inheritdoc ISvrOracleSteward
   function disableSvrOracle(address asset) external onlyGuardian {
     address cachedOracle = _oracleCache[asset];
     if (cachedOracle == address(0)) revert NoCachedOracle();
 
     IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
     address currentOracle = oracle.getSourceOfAsset(asset);
-    if (cachedOracle == currentOracle) revert CannotReplaceOracleWithItself();
+    if (currentOracle != _svrOracles[asset]) revert UnknownOracle();
 
-    _oracleCache[asset] = address(0);
     address[] memory assets = new address[](1);
     assets[0] = asset;
     address[] memory feeds = new address[](1);
@@ -120,6 +99,8 @@ contract SvrOracleSteward is OwnableWithGuardian {
   /**
    * @notice While in rare cases the svrOracle might lag behind the vanilla, at least on activation we want to ensure they are in sync.
    * While this does not guarantee proper functionality it provides some additional assurance on activation.
+   * @param oldFeed The current feed
+   * @param newFeed The svr feed
    */
   function _withinAllowedDeviation(address oldFeed, address newFeed) internal view {
     int256 oldPrice = AggregatorInterface(oldFeed).latestAnswer();
@@ -132,11 +113,16 @@ contract SvrOracleSteward is OwnableWithGuardian {
 
   /**
    * @notice configures a new svrOracle for a specified asset.
+   * @param asset The address of the asset
+   * @param svrOracle The address of the svrOracle to be used for the asset
    */
   function _configureOracle(address asset, address svrOracle) internal {
     if (asset == address(0) || svrOracle == address(0)) revert ZeroAddress();
     if (AggregatorInterface(svrOracle).decimals() != 8) revert InvalidOracleDecimals();
+    IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
+    address currentOracle = oracle.getSourceOfAsset(asset);
+    _oracleCache[asset] = currentOracle;
     _svrOracles[asset] = svrOracle;
-    emit SvrOracleChanged(asset, svrOracle);
+    emit SvrOracleConfigChanged(asset, currentOracle, svrOracle);
   }
 }
