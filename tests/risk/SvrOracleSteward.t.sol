@@ -10,9 +10,28 @@ import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessCon
 import {
   Ownable, OwnableWithGuardian, IWithGuardian
 } from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
+import {AggregatorInterface} from "aave-v3-origin/contracts/dependencies/chainlink/AggregatorInterface.sol";
 
 import {ISvrOracleSteward} from "../../src/risk/interfaces/ISvrOracleSteward.sol";
 import {SvrOracleSteward, DeploySvrOracleSteward_Lib} from "../../script/SvrOracleSteward.s.sol";
+
+contract OracleMock {
+  int256 internal _price;
+  uint256 internal _decimals;
+
+  constructor(int256 price, uint256 decimals) {
+    _price = price;
+    _decimals = decimals;
+  }
+
+  function latestAnswer() external returns (int256) {
+    return _price;
+  }
+
+  function decimals() external returns (uint256) {
+    return _decimals;
+  }
+}
 
 contract SvrOracleStewardBaseTest is Test {
   SvrOracleSteward internal steward;
@@ -42,6 +61,15 @@ contract SvrOracleStewardBaseTest is Test {
     assertEq(wbtcOracle, cachedOracle);
   }
 
+  function test_configureOracle_shouldRevertWithWrongOracle() external {
+    OracleMock decimals18 = new OracleMock(1, 18);
+    vm.prank(steward.owner());
+    ISvrOracleSteward.AssetOracle memory config =
+      ISvrOracleSteward.AssetOracle({asset: AaveV3EthereumAssets.cbBTC_UNDERLYING, svrOracle: address(decimals18)});
+    vm.expectRevert(abi.encodeWithSelector(ISvrOracleSteward.InvalidOracleDecimals.selector));
+    steward.configureOracle(config);
+  }
+
   function test_activateSvrOracle_shouldRevertIfNotConfig() public {
     vm.prank(guardian);
     vm.expectRevert(abi.encodeWithSelector(ISvrOracleSteward.NoSvrOracleConfigured.selector));
@@ -53,6 +81,32 @@ contract SvrOracleStewardBaseTest is Test {
     steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
     address cbBTCOracle = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.cbBTC_UNDERLYING);
     assertEq(cbBTCOracle, cbBTC_SVR_ORACLE);
+  }
+
+  function test_activateSvroracle_shouldRevertIfDeviationExceeded() external {
+    address cbBTCOracleBefore = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    int256 currentPrice = AggregatorInterface(cbBTCOracleBefore).latestAnswer();
+    vm.mockCall(
+      address(cbBTC_SVR_ORACLE),
+      abi.encodeWithSelector(AggregatorInterface.latestAnswer.selector),
+      abi.encode((currentPrice * 100_11 / 100_00))
+    );
+    vm.prank(guardian);
+    vm.expectRevert(
+      abi.encodeWithSelector(ISvrOracleSteward.OracleDeviation.selector, currentPrice, (currentPrice * 100_11 / 100_00))
+    );
+    steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+
+    vm.mockCall(
+      address(cbBTC_SVR_ORACLE),
+      abi.encodeWithSelector(AggregatorInterface.latestAnswer.selector),
+      abi.encode((currentPrice * 99_89 / 100_00))
+    );
+    vm.prank(guardian);
+    vm.expectRevert(
+      abi.encodeWithSelector(ISvrOracleSteward.OracleDeviation.selector, currentPrice, (currentPrice * 99_89 / 100_00))
+    );
+    steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
   }
 
   function test_activateSvroracle_shouldRevertIfOracleChangedOutside() public {

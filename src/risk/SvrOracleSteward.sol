@@ -71,7 +71,7 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
     IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
     address currentOracle = oracle.getSourceOfAsset(asset);
     if (currentOracle != _oracleCache[asset]) revert UnknownOracle();
-    _withinAllowedDeviation(svrOracle, currentOracle);
+    _withinAllowedDeviation(currentOracle, svrOracle);
 
     address[] memory assets = new address[](1);
     assets[0] = asset;
