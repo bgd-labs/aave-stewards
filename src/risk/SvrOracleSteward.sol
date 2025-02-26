@@ -37,6 +37,10 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   /// @inheritdoc ISvrOracleSteward
   IPoolAddressesProvider public immutable POOL_ADDRESSES_PROVIDER;
 
+  int256 internal constant BPS_MAX = 100_00;
+  // allow deviation of <0.1%
+  int256 internal constant MAX_DEVIATION_BPS = 10;
+
   // stores the configured svr oracles
   mapping(address asset => address svrOracle) internal _svrOracles;
   // stores a snapshot of the oracle at configuration time
@@ -113,9 +117,9 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
     int256 oldPrice = AggregatorInterface(oldFeed).latestAnswer();
     int256 newPrice = AggregatorInterface(newFeed).latestAnswer();
     int256 difference = oldPrice >= newPrice ? oldPrice - newPrice : newPrice - oldPrice;
-    int256 average = (oldPrice + newPrice) / 2;
-    // allow deviation of <0.1%
-    if (difference * 1e4 > average * 10) revert OracleDeviation(oldPrice, newPrice);
+    int256 maxDiff = (MAX_DEVIATION_BPS * oldPrice) / BPS_MAX;
+
+    if (difference > maxDiff) revert OracleDeviation(oldPrice, newPrice);
   }
 
   /**
