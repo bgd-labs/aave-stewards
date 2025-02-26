@@ -65,6 +65,13 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   }
 
   /// @inheritdoc ISvrOracleSteward
+  function removeOracle(address asset) external onlyOwner {
+    _oracleCache[asset] = address(0);
+    _svrOracles[asset] = address(0);
+    emit SvrOracleConfigChanged(asset, address(0), address(0));
+  }
+
+  /// @inheritdoc ISvrOracleSteward
   function enableSvrOracle(address asset) external onlyGuardian {
     address svrOracle = _svrOracles[asset];
     if (svrOracle == address(0)) revert NoSvrOracleConfigured();

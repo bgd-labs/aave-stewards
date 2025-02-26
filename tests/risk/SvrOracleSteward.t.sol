@@ -24,11 +24,11 @@ contract OracleMock {
     _decimals = decimals;
   }
 
-  function latestAnswer() external returns (int256) {
+  function latestAnswer() external view returns (int256) {
     return _price;
   }
 
-  function decimals() external returns (uint256) {
+  function decimals() external view returns (uint256) {
     return _decimals;
   }
 }
@@ -49,16 +49,20 @@ contract SvrOracleStewardBaseTest is Test {
 
   function test_configureOracle() public {
     vm.prank(steward.owner());
-    ISvrOracleSteward.AssetOracle memory config = ISvrOracleSteward.AssetOracle({
-      asset: AaveV3EthereumAssets.cbBTC_UNDERLYING,
-      svrOracle: address(cbBTC_SVR_ORACLE)
-    });
+    ISvrOracleSteward.AssetOracle memory config =
+      ISvrOracleSteward.AssetOracle({asset: AaveV3EthereumAssets.WBTC_UNDERLYING, svrOracle: address(cbBTC_SVR_ORACLE)});
     steward.configureOracle(config);
 
-    (address cachedOracle, address svrOracle) = steward.getOracleConfig(AaveV3EthereumAssets.cbBTC_UNDERLYING);
-    address wbtcOracle = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    (address cachedOracle, address svrOracle) = steward.getOracleConfig(AaveV3EthereumAssets.WBTC_UNDERLYING);
+    address wbtcOracle = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.WBTC_UNDERLYING);
     assertEq(svrOracle, cbBTC_SVR_ORACLE);
     assertEq(wbtcOracle, cachedOracle);
+
+    vm.prank(steward.owner());
+    steward.removeOracle(AaveV3EthereumAssets.WBTC_UNDERLYING);
+    (address cachedOracleAfter, address svrOracleAfter) = steward.getOracleConfig(AaveV3EthereumAssets.WBTC_UNDERLYING);
+    assertEq(cachedOracleAfter, address(0));
+    assertEq(svrOracleAfter, address(0));
   }
 
   function test_configureOracle_shouldRevertWithWrongOracle() external {

@@ -37,6 +37,12 @@ interface ISvrOracleSteward {
   function configureOracle(AssetOracle calldata configInput) external;
 
   /**
+   * @notice Removes an oracle configuration.
+   * @param asset The asset to remove.
+   */
+  function removeOracle(address asset) external;
+
+  /**
    * @notice Enables a previously configured svrOracle.
    * @param asset Address of the asset for which to enable the svrOracle for.
    * @dev An oracle can only be enabed, when:
