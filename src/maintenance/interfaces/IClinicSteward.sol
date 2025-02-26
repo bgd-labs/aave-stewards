@@ -8,8 +8,24 @@ import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuab
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 interface IClinicSteward is IRescuableBase, IAccessControl {
+  /* ERRORS */
+
   /// @notice Thrown when passed address is zero
   error ZeroAddress();
+
+  /// @notice Thrown when an attempt is made to pull more funds (in dollar value) than the remaining pull limit allows.
+  /// @param asset The asset being pulled.
+  /// @param assetAmount The amount of the asset being pulled.
+  /// @param dollarAmount The equivalent dollar value of the assetAmount.
+  /// @param restDollarPullLimit The remaining dollar pull limit.
+  error DollarPullLimitExceeded(address asset, uint256 assetAmount, uint256 dollarAmount, uint256 restDollarPullLimit);
+
+  /* EVENTS */
+
+  /// @notice Emitted when total or rest dollar pull limit is changed
+  /// @param oldValue The previous value of the limit.
+  /// @param newValue The new value of the limit.
+  event DollarPullLimitChanged(uint256 oldValue, uint256 newValue);
 
   /* GLOBAL VARIABLES */
 
@@ -21,6 +37,15 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
 
   /// @notice The Aave collector
   function COLLECTOR() external view returns (address);
+
+  /// @notice The Aave oracle
+  function ORACLE() external view returns (address);
+
+  /// @notice The total dollar pull limit
+  function totalDollarPullLimit() external view returns (uint256);
+
+  /// @notice The rest dollar pull limit
+  function restDollarPullLimit() external view returns (uint256);
 
   /* EXTERNAL FUNCTIONS */
 

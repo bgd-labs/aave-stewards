@@ -9,6 +9,7 @@ import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
 import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 import {IClinicSteward} from "../../src/maintenance/interfaces/IClinicSteward.sol";
@@ -59,9 +60,11 @@ contract ClinicStewardBaseTest is Test {
 
   address public collector = address(AaveV3Avalanche.COLLECTOR);
 
+  uint256 public pullLimit = 1_000_000e8;
+
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
-    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian);
+    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, pullLimit);
 
     // v3.3 pool upgrade
     GovV3Helpers.executePayload(vm, 67);
@@ -118,6 +121,10 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     assertEq(collectorBalanceBefore - collectorBalanceAfter, totalBadDebt);
 
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    assertEq(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount);
+
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
     }
@@ -141,6 +148,10 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
       100
     );
 
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    assertEq(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount);
+
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
     }
@@ -156,6 +167,28 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     );
 
     vm.prank(caller);
+    steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt, false);
+  }
+
+  function test_reverts_batchRepayBadDebt_exceeded_pull_limit() public {
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+
+    uint256 _pullLimit = debtDollarAmount / 2;
+
+    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, _pullLimit);
+
+    vm.expectRevert(
+      abi.encodePacked(
+        IClinicSteward.DollarPullLimitExceeded.selector,
+        uint256(uint160(assetUnderlying)),
+        totalBadDebt,
+        debtDollarAmount,
+        _pullLimit
+      )
+    );
+
+    vm.prank(guardian);
     steward.batchRepayBadDebt(assetUnderlying, usersWithBadDebt, false);
   }
 
@@ -179,6 +212,11 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
     assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
+    uint256 liquidatedDebtAmount = collectorBalanceBefore - collectorBalanceAfter;
+
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * liquidatedDebtAmount)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    assertEq(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
 
@@ -197,6 +235,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
   function test_batchLiquidateUseAToken() public {
     address debtAToken = AaveV3Avalanche.POOL.getReserveAToken(assetUnderlying);
     uint256 collectorBalanceBefore = IERC20(debtAToken).balanceOf(collector);
+    uint256 collectorDebtUnderlyingBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
     address collateralAToken = AaveV3Avalanche.POOL.getReserveAToken(collateralEligibleForLiquidations);
@@ -207,13 +246,22 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, true);
 
     uint256 collectorBalanceAfter = IERC20(debtAToken).balanceOf(collector);
+    uint256 collectorDebtUnderlyingBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
 
     uint256 collectorCollateralBalanceAfter = IERC20(collateralAToken).balanceOf(collector);
     uint256 stewardCollateralBalanceAfter = IERC20(collateralAToken).balanceOf(address(steward));
 
     assertGe(collectorBalanceBefore, collectorBalanceAfter);
+    assertGe(collectorDebtUnderlyingBalanceAfter, collectorDebtUnderlyingBalanceBefore);
     assertLe(collectorBalanceBefore - collectorBalanceAfter, totalDebtToLiquidate + 1); // account for 1 wei rounding surplus
+
+    uint256 liquidatedDebtAmount = collectorBalanceBefore - collectorBalanceAfter
+      - (collectorDebtUnderlyingBalanceAfter - collectorDebtUnderlyingBalanceBefore);
+
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * liquidatedDebtAmount)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    assertApproxEqAbs(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount, 1);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
 
@@ -239,6 +287,28 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     );
 
     vm.prank(caller);
+    steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, false);
+  }
+
+  function test_reverts_batchLiquidate_exceeded_pull_limit() public {
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+
+    uint256 _pullLimit = debtDollarAmount / 2;
+
+    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, _pullLimit);
+
+    vm.expectRevert(
+      abi.encodePacked(
+        IClinicSteward.DollarPullLimitExceeded.selector,
+        uint256(uint160(assetUnderlying)),
+        totalDebtToLiquidate,
+        debtDollarAmount,
+        _pullLimit
+      )
+    );
+
+    vm.prank(guardian);
     steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, false);
   }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPool, DataTypes} from "aave-address-book/AaveV3.sol";
+import {IPool, DataTypes, IPoolAddressesProvider, IPriceOracleGetter} from "aave-address-book/AaveV3.sol";
 
 import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
 import {ICollector, IERC20 as IERC20Col} from "aave-v3-origin/contracts/treasury/ICollector.sol";
@@ -14,6 +14,7 @@ import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
 
@@ -46,6 +47,11 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  * --- Access control
  * Upon creation, a DAO-permitted entity is configured as the AccessControl default admin.
  * For operational flexibility, this entity can give permissions to other addresses (`CLEANUP_ROLE` role).
+ *
+ * --- Dollar Pull Limit ---
+ * The contract has a configurable limit on the total dollar value of assets that can be pulled from the Collector.
+ * This limit (`totalDollarPullLimit`) is set upon contract creation and can be tracked via `restDollarPullLimit`.
+ * Any attempt to pull funds exceeding the remaining limit will revert with `DollarPullLimitExceeded` error.
  */
 contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
@@ -62,15 +68,36 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   /// @inheritdoc IClinicSteward
   address public immutable override COLLECTOR;
 
+  /// @inheritdoc IClinicSteward
+  address public immutable override ORACLE;
+
+  /// @inheritdoc IClinicSteward
+  uint256 public immutable override totalDollarPullLimit;
+
+  /// @inheritdoc IClinicSteward
+  uint256 public override restDollarPullLimit;
+
   /* CONSTRUCTOR */
 
-  constructor(address pool, address collector, address admin, address cleanupRoleRecipient) {
+  constructor(
+    address pool,
+    address collector,
+    address admin,
+    address cleanupRoleRecipient,
+    uint256 _totalDollarPullLimit
+  ) {
     if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
       revert ZeroAddress();
     }
 
     POOL = IPool(pool);
     COLLECTOR = collector;
+    ORACLE = IPoolAddressesProvider(IPool(pool).ADDRESSES_PROVIDER()).getPriceOracle();
+
+    totalDollarPullLimit = _totalDollarPullLimit;
+    restDollarPullLimit = _totalDollarPullLimit;
+
+    emit DollarPullLimitChanged({oldValue: 0, newValue: _totalDollarPullLimit});
 
     _grantRole(DEFAULT_ADMIN_ROLE, admin);
     _grantRole(CLEANUP_ROLE, cleanupRoleRecipient);
@@ -103,7 +130,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
       }
     }
 
-    _transferExcessToCollector(asset);
+    _transferExcessToCollector(asset, true);
   }
 
   /// @inheritdoc IClinicSteward
@@ -128,11 +155,11 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
 
     // the excess is always in the underlying
-    _transferExcessToCollector(debtAsset);
+    _transferExcessToCollector(debtAsset, true);
 
     // transfer back liquidated assets
     address collateralAToken = POOL.getReserveAToken(collateralAsset);
-    _transferExcessToCollector(collateralAToken);
+    _transferExcessToCollector(collateralAToken, false);
   }
 
   /// @inheritdoc IClinicSteward
@@ -172,6 +199,60 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     return IERC20(erc20Token).balanceOf(address(this));
   }
 
+  /* PRIVATE FUNCTIONS */
+
+  function _pullFunds(address asset, uint256 amount, bool useAToken) private {
+    _changePullLimit({asset: asset, amount: useAToken ? amount + 1 : amount, increasePullLimit: false});
+
+    if (useAToken) {
+      address aToken = POOL.getReserveAToken(asset);
+      // 1 wei surplus to account for rounding on multiple operations
+      ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 1);
+      POOL.withdraw(asset, type(uint256).max, address(this));
+    } else {
+      ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), amount);
+    }
+  }
+
+  function _changePullLimit(address asset, uint256 amount, bool increasePullLimit) private {
+    uint256 assetPrice = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
+
+    uint256 dollarAmount = (amount * assetPrice) / (10 ** IERC20Metadata(asset).decimals());
+
+    uint256 oldRestDollarPullLimit = restDollarPullLimit;
+
+    uint256 newRestDollarPullLimit;
+    if (increasePullLimit) {
+      newRestDollarPullLimit = oldRestDollarPullLimit + dollarAmount;
+    } else {
+      if (dollarAmount > oldRestDollarPullLimit) {
+        revert DollarPullLimitExceeded({
+          asset: asset,
+          assetAmount: amount,
+          dollarAmount: dollarAmount,
+          restDollarPullLimit: oldRestDollarPullLimit
+        });
+      }
+
+      newRestDollarPullLimit = oldRestDollarPullLimit - dollarAmount;
+    }
+
+    restDollarPullLimit = newRestDollarPullLimit;
+
+    emit DollarPullLimitChanged({oldValue: oldRestDollarPullLimit, newValue: newRestDollarPullLimit});
+  }
+
+  function _transferExcessToCollector(address asset, bool increasePullLimit) private {
+    uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
+    if (balanceAfter != 0) {
+      if (increasePullLimit) {
+        _changePullLimit({asset: asset, amount: balanceAfter, increasePullLimit: true});
+      }
+
+      IERC20(asset).safeTransfer(COLLECTOR, balanceAfter);
+    }
+  }
+
   /* PRIVATE VIEW FUNCTIONS */
 
   function _getUsersDebtAmounts(address asset, address[] memory users, bool usersCanHaveCollateral)
@@ -200,23 +281,5 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
 
     return (totalDebtAmount, debtAmounts);
-  }
-
-  function _pullFunds(address asset, uint256 amount, bool useAToken) internal {
-    if (useAToken) {
-      address aToken = POOL.getReserveAToken(asset);
-      // 1 wei surplus to account for rounding on multiple operations
-      ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 1);
-      POOL.withdraw(asset, type(uint256).max, address(this));
-    } else {
-      ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), amount);
-    }
-  }
-
-  function _transferExcessToCollector(address asset) internal {
-    uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
-    if (balanceAfter != 0) {
-      IERC20(asset).safeTransfer(COLLECTOR, balanceAfter);
-    }
   }
 }
