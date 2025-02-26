@@ -73,11 +73,11 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   address public immutable override ORACLE;
 
   /// @inheritdoc IClinicSteward
-  uint256 public override restDollarPullLimit;
+  uint256 public override availableBudget;
 
   /* CONSTRUCTOR */
 
-  constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 _dollarPullLimit) {
+  constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 initialBudget) {
     if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
       revert ZeroAddress();
     }
@@ -86,9 +86,9 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     COLLECTOR = collector;
     ORACLE = IPoolAddressesProvider(IPool(pool).ADDRESSES_PROVIDER()).getPriceOracle();
 
-    restDollarPullLimit = _dollarPullLimit;
+    availableBudget = initialBudget;
 
-    emit DollarPullLimitChanged({oldValue: 0, newValue: _dollarPullLimit});
+    emit AvailableBudgetChanged({oldValue: 0, newValue: initialBudget});
 
     _grantRole(DEFAULT_ADMIN_ROLE, admin);
     _grantRole(CLEANUP_ROLE, cleanupRoleRecipient);
@@ -121,7 +121,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
       }
     }
 
-    _transferExcessToCollector(asset, true);
+    _transferExcessToCollector(asset);
   }
 
   /// @inheritdoc IClinicSteward
@@ -146,20 +146,20 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
 
     // the excess is always in the underlying
-    _transferExcessToCollector(debtAsset, true);
+    _transferExcessToCollector(debtAsset);
 
     // transfer back liquidated assets
     address collateralAToken = POOL.getReserveAToken(collateralAsset);
-    _transferExcessToCollector(collateralAToken, false);
+    _transferExcessToCollector(collateralAToken);
   }
 
   /// @inheritdoc IClinicSteward
-  function setDollarPullLimit(uint256 _dollarPullLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    uint256 oldRestDollarPullLimit = restDollarPullLimit;
+  function setAvailableBudget(uint256 newAvailableBudget) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    uint256 oldAvailableBudget = availableBudget;
 
-    restDollarPullLimit = _dollarPullLimit;
+    availableBudget = newAvailableBudget;
 
-    emit DollarPullLimitChanged({oldValue: oldRestDollarPullLimit, newValue: _dollarPullLimit});
+    emit AvailableBudgetChanged({oldValue: oldAvailableBudget, newValue: newAvailableBudget});
   }
 
   /// @inheritdoc IClinicSteward
@@ -202,7 +202,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   /* PRIVATE FUNCTIONS */
 
   function _pullFunds(address asset, uint256 amount, bool useAToken) private {
-    _changePullLimit({asset: asset, amount: useAToken ? amount + 1 : amount, increasePullLimit: false});
+    _changeAvailableBudget({asset: asset, amount: useAToken ? amount + 1 : amount});
 
     if (useAToken) {
       address aToken = POOL.getReserveAToken(asset);
@@ -214,41 +214,32 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
   }
 
-  function _changePullLimit(address asset, uint256 amount, bool increasePullLimit) private {
+  function _changeAvailableBudget(address asset, uint256 amount) private {
     uint256 assetPrice = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
 
     uint256 dollarAmount = (amount * assetPrice) / (10 ** IERC20Metadata(asset).decimals());
 
-    uint256 oldRestDollarPullLimit = restDollarPullLimit;
+    uint256 oldAvailableBudget = availableBudget;
 
-    uint256 newRestDollarPullLimit;
-    if (increasePullLimit) {
-      newRestDollarPullLimit = oldRestDollarPullLimit + dollarAmount;
-    } else {
-      if (dollarAmount > oldRestDollarPullLimit) {
-        revert DollarPullLimitExceeded({
-          asset: asset,
-          assetAmount: amount,
-          dollarAmount: dollarAmount,
-          restDollarPullLimit: oldRestDollarPullLimit
-        });
-      }
-
-      newRestDollarPullLimit = oldRestDollarPullLimit - dollarAmount;
+    if (dollarAmount > oldAvailableBudget) {
+      revert AvailableBudgetExceeded({
+        asset: asset,
+        assetAmount: amount,
+        dollarAmount: dollarAmount,
+        availableBudget: oldAvailableBudget
+      });
     }
 
-    restDollarPullLimit = newRestDollarPullLimit;
+    uint256 newAvailableBudget = oldAvailableBudget - dollarAmount;
 
-    emit DollarPullLimitChanged({oldValue: oldRestDollarPullLimit, newValue: newRestDollarPullLimit});
+    availableBudget = newAvailableBudget;
+
+    emit AvailableBudgetChanged({oldValue: oldAvailableBudget, newValue: newAvailableBudget});
   }
 
-  function _transferExcessToCollector(address asset, bool increasePullLimit) private {
+  function _transferExcessToCollector(address asset) private {
     uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
     if (balanceAfter != 0) {
-      if (increasePullLimit) {
-        _changePullLimit({asset: asset, amount: balanceAfter, increasePullLimit: true});
-      }
-
       IERC20(asset).safeTransfer(COLLECTOR, balanceAfter);
     }
   }

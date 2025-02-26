@@ -60,11 +60,11 @@ contract ClinicStewardBaseTest is Test {
 
   address public collector = address(AaveV3Avalanche.COLLECTOR);
 
-  uint256 public pullLimit = 1_000_000e8;
+  uint256 public availableBudget = 1_000_000e8;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
-    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, pullLimit);
+    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, availableBudget);
 
     // v3.3 pool upgrade
     GovV3Helpers.executePayload(vm, 67);
@@ -123,7 +123,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertEq(steward.restDollarPullLimit(), pullLimit - debtDollarAmount);
+    assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
@@ -150,7 +150,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertEq(steward.restDollarPullLimit(), pullLimit - debtDollarAmount);
+    assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
@@ -174,17 +174,17 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
-    uint256 _pullLimit = debtDollarAmount / 2;
+    uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, _pullLimit);
+    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget);
 
     vm.expectRevert(
       abi.encodePacked(
-        IClinicSteward.DollarPullLimitExceeded.selector,
+        IClinicSteward.AvailableBudgetExceeded.selector,
         uint256(uint160(assetUnderlying)),
         totalBadDebt,
         debtDollarAmount,
-        _pullLimit
+        newAvailableBudget
       )
     );
 
@@ -212,11 +212,10 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
     assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
-    uint256 liquidatedDebtAmount = collectorBalanceBefore - collectorBalanceAfter;
 
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * liquidatedDebtAmount)
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertEq(steward.restDollarPullLimit(), pullLimit - debtDollarAmount);
+    assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
 
@@ -256,12 +255,9 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     assertGe(collectorDebtUnderlyingBalanceAfter, collectorDebtUnderlyingBalanceBefore);
     assertLe(collectorBalanceBefore - collectorBalanceAfter, totalDebtToLiquidate + 1); // account for 1 wei rounding surplus
 
-    uint256 liquidatedDebtAmount = collectorBalanceBefore - collectorBalanceAfter
-      - (collectorDebtUnderlyingBalanceAfter - collectorDebtUnderlyingBalanceBefore);
-
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * liquidatedDebtAmount)
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * (totalDebtToLiquidate + 1))
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertApproxEqAbs(steward.restDollarPullLimit(), pullLimit - debtDollarAmount, 1);
+    assertApproxEqAbs(steward.availableBudget(), availableBudget - debtDollarAmount, 1);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
 
@@ -294,17 +290,17 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
-    uint256 _pullLimit = debtDollarAmount / 2;
+    uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, _pullLimit);
+    steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget);
 
     vm.expectRevert(
       abi.encodePacked(
-        IClinicSteward.DollarPullLimitExceeded.selector,
+        IClinicSteward.AvailableBudgetExceeded.selector,
         uint256(uint160(assetUnderlying)),
         totalDebtToLiquidate,
         debtDollarAmount,
-        _pullLimit
+        newAvailableBudget
       )
     );
 
@@ -312,19 +308,19 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, false);
   }
 
-  function test_setDollarPullLimit() public {
-    uint256 newDollarPullLimit = pullLimit / 2;
+  function test_setAvailableBudget() public {
+    uint256 newAvailableBudget = availableBudget / 2;
 
     vm.expectEmit(address(steward));
-    emit IClinicSteward.DollarPullLimitChanged({oldValue: pullLimit, newValue: newDollarPullLimit});
+    emit IClinicSteward.AvailableBudgetChanged({oldValue: availableBudget, newValue: newAvailableBudget});
 
     vm.prank(admin);
-    steward.setDollarPullLimit(newDollarPullLimit);
+    steward.setAvailableBudget(newAvailableBudget);
 
-    assertEq(steward.restDollarPullLimit(), newDollarPullLimit);
+    assertEq(steward.availableBudget(), newAvailableBudget);
   }
 
-  function test_reverts_setDollarPullLimit_caller_not_admin(address caller) public {
+  function test_reverts_setAvailableBudget_caller_not_admin(address caller) public {
     vm.assume(caller != admin);
 
     vm.expectRevert(
@@ -334,7 +330,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     );
 
     vm.prank(caller);
-    steward.setDollarPullLimit(0);
+    steward.setAvailableBudget(0);
   }
 
   function test_rescueToken() public {

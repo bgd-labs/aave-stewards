@@ -13,19 +13,11 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @notice Thrown when passed address is zero
   error ZeroAddress();
 
-  /// @notice Thrown when an attempt is made to pull more funds (in dollar value) than the remaining pull limit allows.
-  /// @param asset The asset being pulled.
-  /// @param assetAmount The amount of the asset being pulled.
-  /// @param dollarAmount The equivalent dollar value of the assetAmount.
-  /// @param restDollarPullLimit The remaining dollar pull limit.
-  error DollarPullLimitExceeded(address asset, uint256 assetAmount, uint256 dollarAmount, uint256 restDollarPullLimit);
+  error AvailableBudgetExceeded(address asset, uint256 assetAmount, uint256 dollarAmount, uint256 availableBudget);
 
   /* EVENTS */
 
-  /// @notice Emitted when total or rest dollar pull limit is changed
-  /// @param oldValue The previous value of the limit.
-  /// @param newValue The new value of the limit.
-  event DollarPullLimitChanged(uint256 oldValue, uint256 newValue);
+  event AvailableBudgetChanged(uint256 oldValue, uint256 newValue);
 
   /* GLOBAL VARIABLES */
 
@@ -42,7 +34,7 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   function ORACLE() external view returns (address);
 
   /// @notice The rest dollar pull limit
-  function restDollarPullLimit() external view returns (uint256);
+  function availableBudget() external view returns (uint256);
 
   /* EXTERNAL FUNCTIONS */
 
@@ -64,9 +56,7 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   ///                   If false it will pull the underlying.
   function batchRepayBadDebt(address asset, address[] calldata users, bool useATokens) external;
 
-  /// @notice Sets a new dollar pull limit. Can only be called by the `DEFAULT_ADMIN_ROLE`.
-  /// @param _dollarPullLimit The new maximum dollar value of assets that can be pulled.
-  function setDollarPullLimit(uint256 _dollarPullLimit) external;
+  function setAvailableBudget(uint256 newAvailableBudget) external;
 
   /// @notice Rescues the tokens
   /// @param token The address of the token to rescue
