@@ -35,4 +35,23 @@ interface ISvrOracleSteward {
    * @param configInput A configuration input struct containing the asset and svrOracle.
    */
   function configureOracle(AssetOracle calldata configInput) external;
+
+  /**
+   * @notice Enables a previously configured svrOracle.
+   * @param asset Address of the asset for which to enable the svrOracle for.
+   * @dev An oracle can only be enabed, when:
+   * - it was previously configured
+   * - the price deviation compared to the current oracle is within bounds
+   * - the current oracle is still the one that was configured when the svrOracle was configured
+   */
+  function enableSvrOracle(address asset) external;
+
+  /**
+   * @notice Disables a previously configured svrOracle.
+   * @param asset Address of the asset for which to enable the svrOracle for.
+   * @dev An oracle can only be enabed, when:
+   * - it was previously configured/cached
+   * - the current oracle is the configured svrOracle
+   */
+  function disableSvrOracle(address asset) external;
 }
