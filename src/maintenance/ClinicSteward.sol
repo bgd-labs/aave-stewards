@@ -50,7 +50,8 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  *
  * --- Dollar Pull Limit ---
  * The contract has a configurable limit on the total dollar value of assets that can be pulled from the Collector.
- * This limit (`totalDollarPullLimit`) is set upon contract creation and can be tracked via `restDollarPullLimit`.
+ * This limit is set upon contract creation and can be updated by the `DEFAULT_ADMIN_ROLE` via `setDollarPullLimit`.
+ * The current limit can be tracked via `restDollarPullLimit`.
  * Any attempt to pull funds exceeding the remaining limit will revert with `DollarPullLimitExceeded` error.
  */
 contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessControl {
@@ -72,20 +73,11 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   address public immutable override ORACLE;
 
   /// @inheritdoc IClinicSteward
-  uint256 public immutable override totalDollarPullLimit;
-
-  /// @inheritdoc IClinicSteward
   uint256 public override restDollarPullLimit;
 
   /* CONSTRUCTOR */
 
-  constructor(
-    address pool,
-    address collector,
-    address admin,
-    address cleanupRoleRecipient,
-    uint256 _totalDollarPullLimit
-  ) {
+  constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 _dollarPullLimit) {
     if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
       revert ZeroAddress();
     }
@@ -94,10 +86,9 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     COLLECTOR = collector;
     ORACLE = IPoolAddressesProvider(IPool(pool).ADDRESSES_PROVIDER()).getPriceOracle();
 
-    totalDollarPullLimit = _totalDollarPullLimit;
-    restDollarPullLimit = _totalDollarPullLimit;
+    restDollarPullLimit = _dollarPullLimit;
 
-    emit DollarPullLimitChanged({oldValue: 0, newValue: _totalDollarPullLimit});
+    emit DollarPullLimitChanged({oldValue: 0, newValue: _dollarPullLimit});
 
     _grantRole(DEFAULT_ADMIN_ROLE, admin);
     _grantRole(CLEANUP_ROLE, cleanupRoleRecipient);
@@ -160,6 +151,15 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     // transfer back liquidated assets
     address collateralAToken = POOL.getReserveAToken(collateralAsset);
     _transferExcessToCollector(collateralAToken, false);
+  }
+
+  /// @inheritdoc IClinicSteward
+  function setDollarPullLimit(uint256 _dollarPullLimit) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    uint256 oldRestDollarPullLimit = restDollarPullLimit;
+
+    restDollarPullLimit = _dollarPullLimit;
+
+    emit DollarPullLimitChanged({oldValue: oldRestDollarPullLimit, newValue: _dollarPullLimit});
   }
 
   /// @inheritdoc IClinicSteward

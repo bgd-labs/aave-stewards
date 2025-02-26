@@ -123,7 +123,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertEq(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount);
+    assertEq(steward.restDollarPullLimit(), pullLimit - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
@@ -150,7 +150,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertEq(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount);
+    assertEq(steward.restDollarPullLimit(), pullLimit - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       assertEq(IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]), 0);
@@ -216,7 +216,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * liquidatedDebtAmount)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertEq(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount);
+    assertEq(steward.restDollarPullLimit(), pullLimit - debtDollarAmount);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
 
@@ -261,7 +261,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * liquidatedDebtAmount)
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
-    assertApproxEqAbs(steward.restDollarPullLimit(), steward.totalDollarPullLimit() - debtDollarAmount, 1);
+    assertApproxEqAbs(steward.restDollarPullLimit(), pullLimit - debtDollarAmount, 1);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
 
@@ -310,6 +310,31 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     vm.prank(guardian);
     steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, false);
+  }
+
+  function test_setDollarPullLimit() public {
+    uint256 newDollarPullLimit = pullLimit / 2;
+
+    vm.expectEmit(address(steward));
+    emit IClinicSteward.DollarPullLimitChanged({oldValue: pullLimit, newValue: newDollarPullLimit});
+
+    vm.prank(admin);
+    steward.setDollarPullLimit(newDollarPullLimit);
+
+    assertEq(steward.restDollarPullLimit(), newDollarPullLimit);
+  }
+
+  function test_reverts_setDollarPullLimit_caller_not_admin(address caller) public {
+    vm.assume(caller != admin);
+
+    vm.expectRevert(
+      abi.encodePacked(
+        IAccessControl.AccessControlUnauthorizedAccount.selector, uint256(uint160(caller)), steward.DEFAULT_ADMIN_ROLE()
+      )
+    );
+
+    vm.prank(caller);
+    steward.setDollarPullLimit(0);
   }
 
   function test_rescueToken() public {

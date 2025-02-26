@@ -41,9 +41,6 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @notice The Aave oracle
   function ORACLE() external view returns (address);
 
-  /// @notice The total dollar pull limit
-  function totalDollarPullLimit() external view returns (uint256);
-
   /// @notice The rest dollar pull limit
   function restDollarPullLimit() external view returns (uint256);
 
@@ -66,6 +63,10 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @param useATokens If true the token will pull aTokens from the collector.
   ///                   If false it will pull the underlying.
   function batchRepayBadDebt(address asset, address[] calldata users, bool useATokens) external;
+
+  /// @notice Sets a new dollar pull limit. Can only be called by the `DEFAULT_ADMIN_ROLE`.
+  /// @param _dollarPullLimit The new maximum dollar value of assets that can be pulled.
+  function setDollarPullLimit(uint256 _dollarPullLimit) external;
 
   /// @notice Rescues the tokens
   /// @param token The address of the token to rescue
