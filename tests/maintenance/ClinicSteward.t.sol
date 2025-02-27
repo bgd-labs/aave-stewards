@@ -178,6 +178,12 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget);
 
+    vm.prank(AaveV3Avalanche.ACL_ADMIN);
+    IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
+
+    vm.prank(collector);
+    IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
+
     vm.expectRevert(
       abi.encodePacked(
         IClinicSteward.AvailableBudgetExceeded.selector,
@@ -255,7 +261,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     assertGe(collectorDebtUnderlyingBalanceAfter, collectorDebtUnderlyingBalanceBefore);
     assertLe(collectorBalanceBefore - collectorBalanceAfter, totalDebtToLiquidate + 1); // account for 1 wei rounding surplus
 
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * (totalDebtToLiquidate + 1))
+    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * (totalDebtToLiquidate))
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertApproxEqAbs(steward.availableBudget(), availableBudget - debtDollarAmount, 1);
 
@@ -293,6 +299,12 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
     steward = new ClinicSteward(address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget);
+
+    vm.prank(AaveV3Avalanche.ACL_ADMIN);
+    IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
+
+    vm.prank(collector);
+    IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
 
     vm.expectRevert(
       abi.encodePacked(

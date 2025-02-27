@@ -98,9 +98,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     COLLECTOR = collector;
     ORACLE = IPoolAddressesProvider(IPool(pool).ADDRESSES_PROVIDER()).getPriceOracle();
 
-    availableBudget = initialBudget;
-
-    emit AvailableBudgetChanged({oldValue: 0, newValue: initialBudget});
+    _setAvailableBudget(initialBudget);
 
     _grantRole(DEFAULT_ADMIN_ROLE, admin);
     _grantRole(CLEANUP_ROLE, cleanupRoleRecipient);
@@ -126,7 +124,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
     _pullFunds(asset, totalDebtAmount, useATokens);
-    _changeAvailableBudget({asset: asset, amount: totalDebtAmount});
+    _decreaseAvailableBudget({asset: asset, amount: totalDebtAmount});
 
     for (uint256 i = 0; i < users.length; i++) {
       if (debtAmounts[i] != 0) {
@@ -161,7 +159,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
 
     // violates CEI which is acceptable given the assets are whitelisted and the contract is permissioned
-    _changeAvailableBudget({asset: debtAsset, amount: maxDebtAmount});
+    _decreaseAvailableBudget({asset: debtAsset, amount: maxDebtAmount});
 
     // the excess is always in the underlying
     _transferExcessToCollector(debtAsset);
@@ -173,11 +171,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
   /// @inheritdoc IClinicSteward
   function setAvailableBudget(uint256 newAvailableBudget) external onlyRole(DEFAULT_ADMIN_ROLE) {
-    uint256 oldAvailableBudget = availableBudget;
-
-    availableBudget = newAvailableBudget;
-
-    emit AvailableBudgetChanged({oldValue: oldAvailableBudget, newValue: newAvailableBudget});
+    _setAvailableBudget(newAvailableBudget);
   }
 
   /// @inheritdoc IClinicSteward
@@ -230,7 +224,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
   }
 
-  function _changeAvailableBudget(address asset, uint256 amount) private {
+  function _decreaseAvailableBudget(address asset, uint256 amount) private {
     uint256 assetPrice = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
 
     uint256 dollarAmount = (amount * assetPrice) / (10 ** IERC20Metadata(asset).decimals());
@@ -246,7 +240,11 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
       });
     }
 
-    uint256 newAvailableBudget = oldAvailableBudget - dollarAmount;
+    _setAvailableBudget(oldAvailableBudget - dollarAmount);
+  }
+
+  function _setAvailableBudget(uint256 newAvailableBudget) private {
+    uint256 oldAvailableBudget = availableBudget;
 
     availableBudget = newAvailableBudget;
 
