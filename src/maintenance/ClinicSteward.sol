@@ -126,6 +126,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
     _pullFunds(asset, totalDebtAmount, useATokens);
+    _changeAvailableBudget({asset: asset, amount: totalDebtAmount});
 
     for (uint256 i = 0; i < users.length; i++) {
       if (debtAmounts[i] != 0) {
@@ -144,7 +145,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   {
     // this is an over approximation as not necessarily all bad debt can be liquidated
     // the excess is transfered back to the collector
-    (uint256 maxDebtAmount,) = getDebtAmount(debtAsset, users);
+    (uint256 maxDebtAmount, uint256[] memory amounts) = getDebtAmount(debtAsset, users);
     _pullFunds(debtAsset, maxDebtAmount, useAToken);
 
     for (uint256 i = 0; i < users.length; i++) {
@@ -154,8 +155,13 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
         user: users[i],
         debtToCover: type(uint256).max,
         receiveAToken: true
-      }) {} catch {}
+      }) {} catch {
+        maxDebtAmount -= amounts[i];
+      }
     }
+
+    // violates CEI which is acceptable given the assets are whitelisted and the contract is permissioned
+    _changeAvailableBudget({asset: debtAsset, amount: maxDebtAmount});
 
     // the excess is always in the underlying
     _transferExcessToCollector(debtAsset);
@@ -214,8 +220,6 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   /* PRIVATE FUNCTIONS */
 
   function _pullFunds(address asset, uint256 amount, bool useAToken) private {
-    _changeAvailableBudget({asset: asset, amount: useAToken ? amount + 1 : amount});
-
     if (useAToken) {
       address aToken = POOL.getReserveAToken(asset);
       // 1 wei surplus to account for rounding on multiple operations
