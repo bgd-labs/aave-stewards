@@ -65,7 +65,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   /* CONSTRUCTOR */
 
   constructor(address pool, address collector, address admin, address cleanupRoleRecipient) {
-    if (pool == address(0) || collector == address(0)) {
+    if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
       revert ZeroAddress();
     }
 
@@ -74,9 +74,20 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
     _grantRole(DEFAULT_ADMIN_ROLE, admin);
     _grantRole(CLEANUP_ROLE, cleanupRoleRecipient);
+
+    address[] memory reserves = POOL.getReservesList();
+    for (uint256 i = 0; i < reserves.length; i++) {
+      IERC20(reserves[i]).forceApprove(address(POOL), type(uint256).max);
+    }
   }
 
   /* EXTERNAL FUNCTIONS */
+
+  /// @inheritdoc IClinicSteward
+  function renewAllowance(address asset) external onlyRole(CLEANUP_ROLE) {
+    IERC20(asset).forceApprove(address(POOL), type(uint256).max);
+  }
+
   /// @inheritdoc IClinicSteward
   function batchRepayBadDebt(address asset, address[] memory users, bool useATokens)
     external
@@ -84,10 +95,12 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     onlyRole(CLEANUP_ROLE)
   {
     (uint256 totalDebtAmount, uint256[] memory debtAmounts) = getBadDebtAmount(asset, users);
-    _pullFundsAndApprove(asset, totalDebtAmount, useATokens);
+    _pullFunds(asset, totalDebtAmount, useATokens);
 
     for (uint256 i = 0; i < users.length; i++) {
-      POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
+      if (debtAmounts[i] != 0) {
+        POOL.repay({asset: asset, amount: debtAmounts[i], interestRateMode: 2, onBehalfOf: users[i]});
+      }
     }
 
     _transferExcessToCollector(asset);
@@ -102,16 +115,16 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     // this is an over approximation as not necessarily all bad debt can be liquidated
     // the excess is transfered back to the collector
     (uint256 maxDebtAmount,) = getDebtAmount(debtAsset, users);
-    _pullFundsAndApprove(debtAsset, maxDebtAmount, useAToken);
+    _pullFunds(debtAsset, maxDebtAmount, useAToken);
 
     for (uint256 i = 0; i < users.length; i++) {
-      POOL.liquidationCall({
+      try POOL.liquidationCall({
         collateralAsset: collateralAsset,
         debtAsset: debtAsset,
         user: users[i],
         debtToCover: type(uint256).max,
         receiveAToken: true
-      });
+      }) {} catch {}
     }
 
     // the excess is always in the underlying
@@ -179,7 +192,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
         DataTypes.UserConfigurationMap memory userConfiguration = POOL.getUserConfiguration(user);
 
         if (userConfiguration.isUsingAsCollateralAny()) {
-          revert UserHasSomeCollateral(user);
+          continue;
         }
       }
 
@@ -189,7 +202,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     return (totalDebtAmount, debtAmounts);
   }
 
-  function _pullFundsAndApprove(address asset, uint256 amount, bool useAToken) internal {
+  function _pullFunds(address asset, uint256 amount, bool useAToken) internal {
     if (useAToken) {
       address aToken = POOL.getReserveAToken(asset);
       // 1 wei surplus to account for rounding on multiple operations
@@ -198,7 +211,6 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     } else {
       ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), amount);
     }
-    IERC20(asset).forceApprove(address(POOL), amount);
   }
 
   function _transferExcessToCollector(address asset) internal {
