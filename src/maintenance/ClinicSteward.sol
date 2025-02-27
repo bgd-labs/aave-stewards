@@ -48,11 +48,14 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  * Upon creation, a DAO-permitted entity is configured as the AccessControl default admin.
  * For operational flexibility, this entity can give permissions to other addresses (`CLEANUP_ROLE` role).
  *
- * --- Dollar Pull Limit ---
+ * --- Budget ---
  * The contract has a configurable limit on the total dollar value of assets that can be pulled from the Collector.
  * This limit is set upon contract creation and can be updated by the `DEFAULT_ADMIN_ROLE` via `setDollarPullLimit`.
- * The current limit can be tracked via `restDollarPullLimit`.
- * Any attempt to pull funds exceeding the remaining limit will revert with `DollarPullLimitExceeded` error.
+ * The current limit can be tracked via `availableBudget`.
+ * Any attempt to pull funds exceeding the remaining limit will revert with `AvailableBudgetExceeded ` error.
+ * When repaying or liquidating assets, the budget is always decreasing by the estimated amount of funds needed.
+ * Even if only a subset of the funds is actually spent (e.g. when overestimating debt on liquidation) the budget is reduced by the full amount.
+ * This is no exact science and the goal achieved by the mechanic is to maintain an upper bound of funds that can be spent.
  */
 contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
