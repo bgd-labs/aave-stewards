@@ -50,12 +50,16 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  *
  * --- Budget ---
  * The contract has a configurable limit on the total dollar value of assets that can be pulled from the Collector.
- * This limit is set upon contract creation and can be updated by the `DEFAULT_ADMIN_ROLE` via `setDollarPullLimit`.
+ * This limit is set upon contract creation and can be updated by the `DEFAULT_ADMIN_ROLE` via `setAvailableBudget`.
  * The current limit can be tracked via `availableBudget`.
- * Any attempt to pull funds exceeding the remaining limit will revert with `AvailableBudgetExceeded ` error.
+ * Any attempt to pull funds exceeding the remaining limit will revert with `AvailableBudgetExceeded` error.
  * When repaying or liquidating assets, the budget is always decreasing by the estimated amount of funds needed.
  * Even if only a subset of the funds is actually spent (e.g. when overestimating debt on liquidation) the budget is reduced by the full amount.
- * This is no exact science and the goal achieved by the mechanic is to maintain an upper bound of funds that can be spent.
+ * This is not an exact science and the goal achieved by the mechanic is to maintain an upper bound of funds that can be spent.
+ *
+ * --- Limitations ---
+ * The available budget is tracked in $ with 8 decimal precision.
+ * When liquidating or repaying assets worth less than 1 unit, it will not be discounted from the budget.
  */
 contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
@@ -80,6 +84,11 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
   /* CONSTRUCTOR */
 
+  /// @param pool The address of the Aave pool.
+  /// @param collector The address of the Aave collector.
+  /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
+  /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
+  /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
   constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 initialBudget) {
     if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
       revert ZeroAddress();

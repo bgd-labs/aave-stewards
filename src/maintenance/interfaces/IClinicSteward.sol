@@ -13,10 +13,18 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @notice Thrown when passed address is zero
   error ZeroAddress();
 
+  /// @notice Thrown when an attempt is made to pull more funds (in dollar value) than the available budget allows.
+  /// @param asset The asset being pulled.
+  /// @param assetAmount The amount of the asset being pulled.
+  /// @param dollarAmount The equivalent dollar value of the assetAmount.
+  /// @param availableBudget The available budget.
   error AvailableBudgetExceeded(address asset, uint256 assetAmount, uint256 dollarAmount, uint256 availableBudget);
 
   /* EVENTS */
 
+  /// @notice Emitted when the available budget is changed.
+  /// @param oldValue The previous available budget.
+  /// @param newValue The new available budget.
   event AvailableBudgetChanged(uint256 oldValue, uint256 newValue);
 
   /* GLOBAL VARIABLES */
@@ -33,7 +41,7 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @notice The Aave oracle
   function ORACLE() external view returns (address);
 
-  /// @notice The rest dollar pull limit
+  /// @notice The available budget for the contract, in dollar value (8 decimals).
   function availableBudget() external view returns (uint256);
 
   /* EXTERNAL FUNCTIONS */
@@ -56,6 +64,8 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   ///                   If false it will pull the underlying.
   function batchRepayBadDebt(address asset, address[] calldata users, bool useATokens) external;
 
+  /// @notice Sets the available budget for the contract.
+  /// @param newAvailableBudget The new available budget, in dollar value (with 8 decimals).
   function setAvailableBudget(uint256 newAvailableBudget) external;
 
   /// @notice Rescues the tokens
