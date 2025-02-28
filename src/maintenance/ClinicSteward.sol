@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import {IPool, DataTypes, IPoolAddressesProvider, IPriceOracleGetter} from "aave-address-book/AaveV3.sol";
 
 import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
-import {ICollector, IERC20 as IERC20Col} from "aave-v3-origin/contracts/treasury/ICollector.sol";
+import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 
 import {IRescuableBase} from "solidity-utils/contracts/utils/interfaces/IRescuableBase.sol";
 import {RescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
@@ -217,10 +217,10 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     if (useAToken) {
       address aToken = POOL.getReserveAToken(asset);
       // 1 wei surplus to account for rounding on multiple operations
-      ICollector(COLLECTOR).transfer(IERC20Col(aToken), address(this), amount + 1);
+      ICollector(COLLECTOR).transfer(IERC20(aToken), address(this), amount + 1);
       POOL.withdraw(asset, type(uint256).max, address(this));
     } else {
-      ICollector(COLLECTOR).transfer(IERC20Col(asset), address(this), amount);
+      ICollector(COLLECTOR).transfer(IERC20(asset), address(this), amount);
     }
   }
 
