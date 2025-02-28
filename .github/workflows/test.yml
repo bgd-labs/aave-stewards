@@ -1,45 +1,24 @@
-name: CI
+# This action runs all common tooling for foundry repos
+# It does not comment any results though.
+# If you want to have comments on your repo, also install comment.yml
+name: Test
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 on:
-  push:
   pull_request:
-  workflow_dispatch:
-
-env:
-  FOUNDRY_PROFILE: ci
+  push:
+    branches: [main]
 
 jobs:
-  check:
-    strategy:
-      fail-fast: true
-
-    name: Foundry project
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Show Forge version
-        run: |
-          forge --version
-
-      - name: Run Forge fmt
-        run: |
-          forge fmt --check
-        id: fmt
-
-      - name: Run Forge build
-        run: |
-          forge build --sizes
-        id: build
-
-      - name: Run Forge tests
-        run: |
-          forge test -vvv
-        id: test
+  lint:
+    uses: bgd-labs/github-workflows/.github/workflows/foundry-lint.yml@main
+  test:
+    uses: bgd-labs/github-workflows/.github/workflows/foundry-test.yml@main
+    secrets:
+      ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+# only when the repo has zksync code
+#  test-zk:
+#    uses: bgd-labs/github-workflows/.github/workflows/foundry-test-zk.yml@main
