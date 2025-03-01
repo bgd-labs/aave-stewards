@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
-import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
+import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
+import {CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
 
 import {ICollectorBudgetSteward} from "./interfaces/ICollectorBudgetSteward.sol";
 
@@ -21,8 +22,8 @@ import {ICollectorBudgetSteward} from "./interfaces/ICollectorBudgetSteward.sol"
  * multiple operations can be bundled into a single transaction.
  *
  * The funds can only be received by governance approved addresses. An example scenario is as follows: the DAO approved 1M GHO, and 5 addresses.
- * The stewards then create a stream to a service provider for 500k GHO, transfer 10k GHO for incentives, and 2k GHO for gas-refunds to providers.
- * The stewards then have 488k GHO at their disposal. A DAO controller multi-sig can also be a beneficiary to handle smaller payments such as
+ * The stewards then have up to 1M GHO tokens to transfer to the 5 addresses that have been previously allowed.
+ * A DAO controller multi-sig can also be a beneficiary to handle smaller payments such as
  * bounty payouts to bug platforms and other ad hoc expenses.
  *
  * -- Permissions
@@ -53,33 +54,9 @@ contract CollectorBudgetSteward is ICollectorBudgetSteward, OwnableWithGuardian,
   /// Controlled Actions
 
   /// @inheritdoc ICollectorBudgetSteward
-  function approve(address token, address to, uint256 amount) external onlyOwnerOrGuardian {
-    _validateTransfer(token, to, amount);
-    COLLECTOR.approve(token, to, amount);
-  }
-
-  /// @inheritdoc ICollectorBudgetSteward
   function transfer(address token, address to, uint256 amount) external onlyOwnerOrGuardian {
     _validateTransfer(token, to, amount);
-    COLLECTOR.transfer(token, to, amount);
-  }
-
-  /// @inheritdoc ICollectorBudgetSteward
-  function createStream(address to, StreamData memory stream) external onlyOwnerOrGuardian {
-    if (stream.start < block.timestamp || stream.end <= stream.start) {
-      revert InvalidDate();
-    }
-
-    _validateTransfer(stream.token, to, stream.amount);
-
-    uint256 duration = stream.end - stream.start;
-
-    COLLECTOR.stream(CU.CreateStreamInput(stream.token, to, stream.amount, stream.start, duration));
-  }
-
-  /// @inheritdoc ICollectorBudgetSteward
-  function cancelStream(uint256 streamId) external onlyOwnerOrGuardian {
-    COLLECTOR.cancelStream(streamId);
+    COLLECTOR.transfer(IERC20(token), to, amount);
   }
 
   /// DAO Actions
