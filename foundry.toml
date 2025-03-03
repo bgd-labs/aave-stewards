@@ -2,6 +2,7 @@
 src = "src"
 out = "out"
 test = "tests"
+script = "scripts"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
