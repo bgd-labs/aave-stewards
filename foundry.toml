@@ -4,6 +4,57 @@ out = "out"
 test = "tests"
 script = "scripts"
 libs = ["lib"]
+optimizer = true
+optimizer_runs = 200
+solc = '0.8.22'
+evm_version = 'shanghai'
+bytecode_hash = 'none'
+
+[profile.zksync]
+libs = ['lib']
+solc = '0.8.27'
+evm_version = 'cancun'
+optimizer = true
+optimizer_runs = 200
+bytecode_hash = 'ipfs'
+
+[profile.zksync.zksync]
+fallback_oz = true
+mode = "3"
+zksolc = "1.5.10"
+
+[profile.metis]
+evm_version = 'shanghai'
+
+[profile.mainnet]
+evm_version = 'shanghai'
+
+[profile.arbitrum]
+evm_version = 'shanghai'
+
+[profile.optimism]
+evm_version = 'shanghai'
+
+[profile.base]
+evm_version = 'shanghai'
+
+[profile.polygon]
+evm_version = 'shanghai'
+
+[profile.avalanche]
+evm_version = 'shanghai'
+
+[profile.gnosis]
+evm_version = 'shanghai'
+
+[profile.bnb]
+evm_version = 'shanghai'
+
+[profile.linea]
+evm_version = 'london'
+
+[profile.sonic]
+evm_version = 'cancun'
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 [rpc_endpoints]
@@ -30,6 +81,24 @@ gnosis = "${RPC_GNOSIS}"
 zkEVM = "${RPC_ZKEVM}"
 celo = "${RPC_CELO}"
 zksync = "${RPC_ZKSYNC}"
+linea = "${RPC_LINEA}"
+
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY_MAINNET}", chain = 1 }
+optimism = { key = "${ETHERSCAN_API_KEY_OPTIMISM}", chain = 10 }
+avalanche = { key = "${ETHERSCAN_API_KEY_AVALANCHE}", chain = 43114 }
+polygon = { key = "${ETHERSCAN_API_KEY_POLYGON}", chain = 137 }
+arbitrum = { key = "${ETHERSCAN_API_KEY_ARBITRUM}", chain = 42161 }
+fantom = { key = "${ETHERSCAN_API_KEY_FANTOM}", chain = 250 }
+metis = { key = "any", chainId = 1088, url = 'https://andromeda-explorer.metis.io/' }
+base = { key = "${ETHERSCAN_API_KEY_BASE}", chainId = 8453 }
+zkevm = { key = "${ETHERSCAN_API_KEY_ZKEVM}", chainId = 1101 }
+gnosis = { key = "${ETHERSCAN_API_KEY_GNOSIS}", chainId = 100 }
+bnb = { key = "${ETHERSCAN_API_KEY_BNB}", chainId = 56, url = 'https://api.bscscan.com/api' }
+scroll = { key = "${ETHERSCAN_API_KEY_SCROLL}", chainId = 534352 }
+zksync = { key = "${ETHERSCAN_API_KEY_ZKSYNC}", chain = 324 }
+linea = { key = "${ETHERSCAN_API_KEY_LINEA}", chain = 59144 }
+sonic = { key = "${ETHERSCAN_API_KEY_SONIC}", chain = 146 }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 [fmt]

@@ -62,7 +62,7 @@ library DeploymentLibrary {
 }
 
 contract Deploy is Script {
-  function deploy() internal {
+  function run() external {
     vm.startBroadcast();
     if (block.chainid == ChainIds.MAINNET) {
       DeploymentLibrary._deploy(
