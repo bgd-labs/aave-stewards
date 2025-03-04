@@ -50,7 +50,13 @@ import {GovernanceV3ZkSync} from "aave-address-book/GovernanceV3ZkSync.sol";
 
 import {PoolExposureSteward} from "../src/finance/PoolExposureSteward.sol";
 
-address constant FINANCE_STEWARD_SAFE = address(0);
+// https://app.safe.global/home?safe=eth:0x22740deBa78d5a0c24C58C740e3715ec29de1bFa
+// Signers are:
+// Marc (AaveChan) - 0x329c54289Ff5D6B7b7daE13592C6B1EDA1543eD4
+// Matt (TokenLogic) - 0xb647055A9915bF9c8021a684E175A353525b9890
+// Chaos Labs - 0x5d49dBcdd300aECc2C311cFB56593E71c445d60d
+// Val (LlamaRisk) - 0xbA037E4746ff58c55dc8F27a328C428F258DDACb
+address constant FINANCE_STEWARD_SAFE = 0x22740deBa78d5a0c24C58C740e3715ec29de1bFa;
 
 library DeploymentLibrary {
   function _deploy(address admin, ICollector collector, address[] memory poolsV2, address[] memory poolsV3) internal {
@@ -80,7 +86,6 @@ contract Deploy is Script {
       DeploymentLibrary._deploy(GovernanceV3Ethereum.EXECUTOR_LVL_1, AaveV3Ethereum.COLLECTOR, poolsV2, poolsV3);
     }
 
-    // Polygon
     if (ChainIds.POLYGON == block.chainid) {
       address[] memory poolsV2 = new address[](1);
       poolsV2[0] = address(AaveV2Polygon.POOL);
@@ -89,7 +94,6 @@ contract Deploy is Script {
       DeploymentLibrary._deploy(GovernanceV3Polygon.EXECUTOR_LVL_1, AaveV3Polygon.COLLECTOR, poolsV2, poolsV3);
     }
 
-    // Avalanche
     if (ChainIds.AVALANCHE == block.chainid) {
       address[] memory poolsV2 = new address[](1);
       poolsV2[0] = address(AaveV2Avalanche.POOL);
