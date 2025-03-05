@@ -158,7 +158,7 @@ contract SvrOracleStewardBaseTest is Test {
   }
 
   function test_ifNoGuardian_activateSvrOracle_shouldRevert() external {
-    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianInvalidCaller.selector, address(this)));
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, address(this)));
     steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
   }
 
