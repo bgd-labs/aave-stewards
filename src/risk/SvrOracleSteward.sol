@@ -76,7 +76,7 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   }
 
   /// @inheritdoc ISvrOracleSteward
-  function enableSvrOracle(address asset) external onlyGuardian {
+  function enableSvrOracle(address asset) external onlyOwnerOrGuardian {
     address svrOracle = _svrOracles[asset];
     if (svrOracle == address(0)) revert NoSvrOracleConfigured();
     IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
