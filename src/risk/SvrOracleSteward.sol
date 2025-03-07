@@ -46,26 +46,15 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   // stores a snapshot of the oracle at configuration time
   mapping(address asset => address cachedOracle) internal _oracleCache;
 
-  constructor(
-    IPoolAddressesProvider addressesProvider,
-    AssetOracle[] memory initialConfigs,
-    address initialOwner,
-    address initialGuardian
-  ) OwnableWithGuardian(initialOwner, initialGuardian) {
+  constructor(IPoolAddressesProvider addressesProvider, address initialOwner, address initialGuardian)
+    OwnableWithGuardian(initialOwner, initialGuardian)
+  {
     POOL_ADDRESSES_PROVIDER = addressesProvider;
-    for (uint256 i = 0; i < initialConfigs.length; i++) {
-      _configureOracle(initialConfigs[i].asset, initialConfigs[i].svrOracle);
-    }
   }
 
   /// @inheritdoc ISvrOracleSteward
   function getOracleConfig(address asset) external view returns (address, address) {
     return (_oracleCache[asset], _svrOracles[asset]);
-  }
-
-  /// @inheritdoc ISvrOracleSteward
-  function configureOracle(AssetOracle calldata configInput) external onlyOwner {
-    _configureOracle(configInput.asset, configInput.svrOracle);
   }
 
   /// @inheritdoc ISvrOracleSteward
@@ -76,18 +65,22 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   }
 
   /// @inheritdoc ISvrOracleSteward
-  function enableSvrOracle(address asset) external onlyOwnerOrGuardian {
-    address svrOracle = _svrOracles[asset];
-    if (svrOracle == address(0)) revert NoSvrOracleConfigured();
+  function enableSvrOracles(AssetOracle[] calldata oracleConfig) external onlyGuardian {
     IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
-    address currentOracle = oracle.getSourceOfAsset(asset);
-    if (currentOracle != _oracleCache[asset]) revert UnknownOracle();
-    _withinAllowedDeviation(currentOracle, svrOracle);
-
-    address[] memory assets = new address[](1);
-    assets[0] = asset;
-    address[] memory feeds = new address[](1);
-    feeds[0] = svrOracle;
+    address[] memory assets = new address[](oracleConfig.length);
+    address[] memory feeds = new address[](oracleConfig.length);
+    for (uint256 i = 0; i < oracleConfig.length; i++) {
+      if (oracleConfig[i].svrOracle == address(0)) revert ZeroAddress();
+      address currentOracle = oracle.getSourceOfAsset(oracleConfig[i].asset);
+      _withinAllowedDeviation(currentOracle, oracleConfig[i].svrOracle);
+      assets[i] = oracleConfig[i].asset;
+      feeds[i] = oracleConfig[i].svrOracle;
+      // cache current oracle
+      _oracleCache[oracleConfig[i].asset] = currentOracle;
+      // cache svr oracle
+      _svrOracles[oracleConfig[i].asset] = oracleConfig[i].svrOracle;
+      emit SvrOracleConfigChanged(oracleConfig[i].asset, currentOracle, oracleConfig[i].svrOracle);
+    }
     oracle.setAssetSources(assets, feeds);
   }
 
@@ -120,20 +113,5 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
     int256 maxDiff = (MAX_DEVIATION_BPS * oldPrice) / BPS_MAX;
 
     if (difference > maxDiff) revert OracleDeviation(oldPrice, newPrice);
-  }
-
-  /**
-   * @notice configures a new svrOracle for a specified asset.
-   * @param asset The address of the asset
-   * @param svrOracle The address of the svrOracle to be used for the asset
-   */
-  function _configureOracle(address asset, address svrOracle) internal {
-    if (asset == address(0) || svrOracle == address(0)) revert ZeroAddress();
-    if (AggregatorInterface(svrOracle).decimals() != 8) revert InvalidOracleDecimals();
-    IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
-    address currentOracle = oracle.getSourceOfAsset(asset);
-    _oracleCache[asset] = currentOracle;
-    _svrOracles[asset] = svrOracle;
-    emit SvrOracleConfigChanged(asset, currentOracle, svrOracle);
   }
 }
