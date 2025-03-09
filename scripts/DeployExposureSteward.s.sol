@@ -55,9 +55,6 @@ import {PoolExposureSteward} from "../src/finance/PoolExposureSteward.sol";
 // Val (LlamaRisk) - 0xbA037E4746ff58c55dc8F27a328C428F258DDACb
 address constant FINANCE_STEWARD_SAFE = 0x22740deBa78d5a0c24C58C740e3715ec29de1bFa;
 
-// // https://app.safe.global/home?safe=eth:0xE983E81B55b7eF64c23f660314c457284B470351
-address constant FINANCE_STEWARD_SAFE_LINEA_SONIC = 0xE983E81B55b7eF64c23f660314c457284B470351;
-
 library DeploymentLibrary {
     function _deploy(
         address admin,
@@ -75,21 +72,6 @@ library DeploymentLibrary {
                 poolsV2,
                 poolsV3
             )
-        );
-    }
-
-    function _deployZk(
-        address admin,
-        ICollector collector,
-        address[] memory poolsV2,
-        address[] memory poolsV3
-    ) internal {
-        new PoolExposureSteward{salt: "v1"}(
-            admin,
-            FINANCE_STEWARD_SAFE,
-            address(collector),
-            poolsV2,
-            poolsV3
         );
     }
 }
