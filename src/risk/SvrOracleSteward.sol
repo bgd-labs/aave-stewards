@@ -26,6 +26,8 @@ import {ISvrOracleSteward} from "./interfaces/ISvrOracleSteward.sol";
  * While the SvrOracle should report the same price as the current Oracle, currently the Svr is served from a different DON.
  * In practice this means that there are slight deviations on the oracle prices.
  * To ensure proper functionality, before activating a Svr it is ensured that the reported price is within narrow bounds (0.1% deviation).
+ *
+ * While there are certain constraints like the deviation, the contract assumes that the guardian is a trustable entity, with a solid rationale to revert an SVR feed to the associated non-SVR.
  */
 contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   /// @inheritdoc ISvrOracleSteward
