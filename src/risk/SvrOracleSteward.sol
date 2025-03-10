@@ -12,26 +12,20 @@ import {ISvrOracleSteward} from "./interfaces/ISvrOracleSteward.sol";
  * @author BGD Labs
  * @notice This contract helps with the configuration of SvrOracles.
  * As svrOracles are a rather new development that potentially alters the oracle mechanics on the aave protocol,
- * the idea is to slowly enable the feeds one by one, while also maintainging the ability to swap back in extreme situations.
+ * the idea is to enable the feeds, while also maintainging the ability to swap back in extreme situations.
  *
  * --- Security considerations
  *
  * The contract requires the "AssetListing" or "PoolAdmin" role in order to be able to replace oracles.
  * Due to the narrow scope of the contract ifself, only oracles can be replaces, no other role permissions can be exercised.
  *
- * The owner role which will be assigned to the governance short executor can list new svrOracles.
- * The guardian role can enable and disable oracles configured by the governance.
+ * The owner role which will be assigned to the governance short executor can enable new svrOracles.
+ * The guardian role can revert the configuration to the previous oracle.
+ * The guardian will only be able to revert if the currently configured oracle is in fact the svr oracle.
  *
  * While the SvrOracle should report the same price as the current Oracle, currently the Svr is served from a different DON.
  * In practice this means that there are slight deviations on the oracle prices.
  * To ensure proper functionality, before activating a Svr it is ensured that the reported price is within narrow bounds (0.1% deviation).
- *
- * --- Limitations
- *
- * When configuring a svrOracle for an asset, the current oracle is cached.
- * The system will only allow siwthing between the cached and the svrOracle.
- * If the oracle changes e.g. via a governanceProposal, the steward will no longer be able to enable the svrOracle.
- * To resume functionality the svr would need to be reconfigured.
  */
 contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   /// @inheritdoc ISvrOracleSteward
