@@ -20,7 +20,7 @@ interface ISvrOracleSteward {
   error InvalidOracleDecimals();
 
   /**
-   * @return The address of the PoolAddressesProvider of the Pool controlled by teh steward.
+   * @return The address of the PoolAddressesProvider of the Pool controlled by the steward.
    */
   function POOL_ADDRESSES_PROVIDER() external view returns (IPoolAddressesProvider);
 
@@ -40,7 +40,7 @@ interface ISvrOracleSteward {
   /**
    * @notice Enables a previously configured svrOracle.
    * @param configInput An array of asset, svrOracle configurations.
-   * @dev An oracle can only be enabed, when:
+   * @dev An oracle can only be enabled, when:
    * - it was previously configured
    * - the price deviation compared to the current oracle is within bounds
    * - the current oracle is still the one that was configured when the svrOracle was configured
@@ -49,8 +49,8 @@ interface ISvrOracleSteward {
 
   /**
    * @notice Disables a previously configured svrOracle.
-   * @param asset Address of the asset for which to enable the svrOracle for.
-   * @dev An oracle can only be enabed, when:
+   * @param asset Address of the asset for which to disable the svrOracle for.
+   * @dev An oracle can only be disabled, when:
    * - it was previously configured/cached
    * - the current oracle is the configured svrOracle
    */
