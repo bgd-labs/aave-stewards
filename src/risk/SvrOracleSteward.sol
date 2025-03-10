@@ -59,7 +59,7 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
   }
 
   /// @inheritdoc ISvrOracleSteward
-  function enableSvrOracles(AssetOracle[] calldata oracleConfig) external onlyGuardian {
+  function enableSvrOracles(AssetOracle[] calldata oracleConfig) external onlyOwner {
     IAaveOracle oracle = IAaveOracle(POOL_ADDRESSES_PROVIDER.getPriceOracle());
     address[] memory assets = new address[](oracleConfig.length);
     address[] memory feeds = new address[](oracleConfig.length);
