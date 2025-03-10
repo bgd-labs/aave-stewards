@@ -19,7 +19,7 @@ import {ISvrOracleSteward} from "./interfaces/ISvrOracleSteward.sol";
  * The contract requires the "AssetListing" or "PoolAdmin" role in order to be able to replace oracles.
  * Due to the narrow scope of the contract itself, only oracles can be replaced, without any extra functionality
  *
- * The owner role which will be assigned to the governance short executor can enable new svrOracles.
+ * The owner role which will be assigned to the governance executor lvl1 can enable new svrOracles.
  * The guardian role can revert the configuration to the previous oracle.
  * The guardian will only be able to revert if the currently configured oracle is in fact the svr oracle.
  *
