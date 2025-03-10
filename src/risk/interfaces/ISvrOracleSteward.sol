@@ -16,6 +16,7 @@ interface ISvrOracleSteward {
   error NoSvrOracleConfigured();
   error NoCachedOracle();
   error ZeroAddress();
+  // The steweard assumes 8 decimal oracles. If a different oracle is passed it will revert.
   error InvalidOracleDecimals();
 
   /**

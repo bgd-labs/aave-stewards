@@ -64,6 +64,7 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
     address[] memory assets = new address[](oracleConfig.length);
     address[] memory feeds = new address[](oracleConfig.length);
     for (uint256 i = 0; i < oracleConfig.length; i++) {
+      if (AggregatorInterface(oracleConfig[i].svrOracle).decimals() != 8) revert InvalidOracleDecimals();
       if (oracleConfig[i].svrOracle == address(0)) revert ZeroAddress();
       address currentOracle = oracle.getSourceOfAsset(oracleConfig[i].asset);
       _withinAllowedDeviation(currentOracle, oracleConfig[i].svrOracle);
