@@ -13,7 +13,7 @@ import {
 import {AggregatorInterface} from "aave-v3-origin/contracts/dependencies/chainlink/AggregatorInterface.sol";
 
 import {ISvrOracleSteward} from "../../src/risk/interfaces/ISvrOracleSteward.sol";
-import {SvrOracleSteward, DeploySvrOracleSteward_Lib} from "../../script/SvrOracleSteward.s.sol";
+import {SvrOracleSteward, DeploySvrOracleSteward_Lib} from "../../scripts/SvrOracleSteward.s.sol";
 
 contract OracleMock {
   int256 internal _price;
@@ -36,6 +36,7 @@ contract OracleMock {
 contract SvrOracleStewardBaseTest is Test {
   SvrOracleSteward internal steward;
   address guardian = address(1);
+  address owner = AaveV3Ethereum.ACL_ADMIN;
 
   address constant cbBTC_SVR_ORACLE = 0x77E55306eeDb1F94a4DcFbAa6628ef87586BC651;
 
@@ -47,44 +48,46 @@ contract SvrOracleStewardBaseTest is Test {
     AaveV3Ethereum.ACL_MANAGER.addAssetListingAdmin(address(steward));
   }
 
+  function _activateSvr() internal {
+    SvrOracleSteward.AssetOracle[] memory configs = new ISvrOracleSteward.AssetOracle[](1);
+    configs[0] = ISvrOracleSteward.AssetOracle({
+      asset: AaveV3EthereumAssets.cbBTC_UNDERLYING,
+      svrOracle: 0x77E55306eeDb1F94a4DcFbAa6628ef87586BC651
+    });
+    steward.enableSvrOracles(configs);
+  }
+
+  function test_activateSvrOracle() public {
+    address cbBTCOracleBefore = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    vm.prank(steward.owner());
+    _activateSvr();
+    address cbBTCOracleAfter = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    assertEq(cbBTCOracleAfter, cbBTC_SVR_ORACLE);
+
+    (address cachedOracle, address svrOracle) = steward.getOracleConfig(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    assertEq(cachedOracle, cbBTCOracleBefore);
+    assertEq(svrOracle, cbBTC_SVR_ORACLE);
+  }
+
   function test_configureOracle() public {
     vm.prank(steward.owner());
-    ISvrOracleSteward.AssetOracle memory config =
-      ISvrOracleSteward.AssetOracle({asset: AaveV3EthereumAssets.WBTC_UNDERLYING, svrOracle: address(cbBTC_SVR_ORACLE)});
-    steward.configureOracle(config);
-
-    (address cachedOracle, address svrOracle) = steward.getOracleConfig(AaveV3EthereumAssets.WBTC_UNDERLYING);
-    address wbtcOracle = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.WBTC_UNDERLYING);
-    assertEq(svrOracle, cbBTC_SVR_ORACLE);
-    assertEq(wbtcOracle, cachedOracle);
+    _activateSvr();
 
     vm.prank(steward.owner());
-    steward.removeOracle(AaveV3EthereumAssets.WBTC_UNDERLYING);
-    (address cachedOracleAfter, address svrOracleAfter) = steward.getOracleConfig(AaveV3EthereumAssets.WBTC_UNDERLYING);
+    steward.removeOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    (address cachedOracleAfter, address svrOracleAfter) = steward.getOracleConfig(AaveV3EthereumAssets.cbBTC_UNDERLYING);
     assertEq(cachedOracleAfter, address(0));
     assertEq(svrOracleAfter, address(0));
   }
 
-  function test_configureOracle_shouldRevertWithWrongOracle() external {
-    OracleMock decimals18 = new OracleMock(1, 18);
-    vm.prank(steward.owner());
-    ISvrOracleSteward.AssetOracle memory config =
+  function test_enableSvrOracles_shouldRevertWithWrongOracle() external {
+    OracleMock decimals18 = new OracleMock(9642121755000, 18);
+    vm.prank(owner);
+    ISvrOracleSteward.AssetOracle[] memory configs = new ISvrOracleSteward.AssetOracle[](1);
+    configs[0] =
       ISvrOracleSteward.AssetOracle({asset: AaveV3EthereumAssets.cbBTC_UNDERLYING, svrOracle: address(decimals18)});
     vm.expectRevert(abi.encodeWithSelector(ISvrOracleSteward.InvalidOracleDecimals.selector));
-    steward.configureOracle(config);
-  }
-
-  function test_activateSvrOracle_shouldRevertIfNotConfig() public {
-    vm.prank(guardian);
-    vm.expectRevert(abi.encodeWithSelector(ISvrOracleSteward.NoSvrOracleConfigured.selector));
-    steward.enableSvrOracle(AaveV3EthereumAssets.WBTC_UNDERLYING);
-  }
-
-  function test_activateSvroracle() public {
-    vm.prank(guardian);
-    steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
-    address cbBTCOracle = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.cbBTC_UNDERLYING);
-    assertEq(cbBTCOracle, cbBTC_SVR_ORACLE);
+    steward.enableSvrOracles(configs);
   }
 
   function test_activateSvroracle_shouldRevertIfDeviationExceeded() external {
@@ -95,46 +98,34 @@ contract SvrOracleStewardBaseTest is Test {
       abi.encodeWithSelector(AggregatorInterface.latestAnswer.selector),
       abi.encode((currentPrice * 100_11 / 100_00))
     );
-    vm.prank(guardian);
+    vm.prank(owner);
     vm.expectRevert(
       abi.encodeWithSelector(ISvrOracleSteward.OracleDeviation.selector, currentPrice, (currentPrice * 100_11 / 100_00))
     );
-    steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    _activateSvr();
 
     vm.mockCall(
       address(cbBTC_SVR_ORACLE),
       abi.encodeWithSelector(AggregatorInterface.latestAnswer.selector),
       abi.encode((currentPrice * 99_89 / 100_00))
     );
-    vm.prank(guardian);
+    vm.prank(owner);
     vm.expectRevert(
       abi.encodeWithSelector(ISvrOracleSteward.OracleDeviation.selector, currentPrice, (currentPrice * 99_89 / 100_00))
     );
-    steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    _activateSvr();
   }
 
-  function test_activateSvroracle_shouldRevertIfOracleChangedOutside() public {
-    address[] memory assets = new address[](1);
-    assets[0] = AaveV3EthereumAssets.cbBTC_UNDERLYING;
-    address[] memory feeds = new address[](1);
-    feeds[0] = address(42);
-    vm.prank(steward.owner());
-    AaveV3Ethereum.ORACLE.setAssetSources(assets, feeds);
-
+  function test_disableSvrOracle_shouldRevertIfNoConfig() external {
     vm.prank(guardian);
-    vm.expectRevert(abi.encodeWithSelector(ISvrOracleSteward.UnknownOracle.selector));
-    steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
-  }
-
-  function test_disableSvrOracle_shouldRevertIfNotConfig() external {
-    vm.prank(guardian);
-    vm.expectRevert(abi.encodeWithSelector(ISvrOracleSteward.UnknownOracle.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISvrOracleSteward.NoCachedOracle.selector));
     steward.disableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
   }
 
   function test_disableSvrOracle() external {
     address cbBTCOracleBefore = AaveV3Ethereum.ORACLE.getSourceOfAsset(AaveV3EthereumAssets.cbBTC_UNDERLYING);
-    test_activateSvroracle();
+    vm.prank(owner);
+    _activateSvr();
 
     vm.prank(guardian);
     steward.disableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
@@ -143,13 +134,14 @@ contract SvrOracleStewardBaseTest is Test {
   }
 
   function test_disableSvrOracle_shouldRevertifOutsideOracleChange() external {
-    test_activateSvroracle();
+    vm.prank(owner);
+    _activateSvr();
 
     address[] memory assets = new address[](1);
     assets[0] = AaveV3EthereumAssets.cbBTC_UNDERLYING;
     address[] memory feeds = new address[](1);
     feeds[0] = address(42);
-    vm.prank(steward.owner());
+    vm.prank(owner);
     AaveV3Ethereum.ORACLE.setAssetSources(assets, feeds);
 
     vm.prank(guardian);
@@ -158,20 +150,17 @@ contract SvrOracleStewardBaseTest is Test {
   }
 
   function test_ifNoGuardian_activateSvrOracle_shouldRevert() external {
-    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, address(this)));
-    steward.enableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
+    SvrOracleSteward.AssetOracle[] memory configs = new ISvrOracleSteward.AssetOracle[](1);
+    configs[0] = ISvrOracleSteward.AssetOracle({
+      asset: AaveV3EthereumAssets.cbBTC_UNDERLYING,
+      svrOracle: 0x77E55306eeDb1F94a4DcFbAa6628ef87586BC651
+    });
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
+    steward.enableSvrOracles(configs);
   }
 
   function test_ifNoGuardian_disableSvrOracle_shouldRevert() external {
     vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianInvalidCaller.selector, address(this)));
     steward.disableSvrOracle(AaveV3EthereumAssets.cbBTC_UNDERLYING);
-  }
-
-  function test_ifNoOwner_configureOracle_shouldRevert() external {
-    ISvrOracleSteward.AssetOracle memory config =
-      ISvrOracleSteward.AssetOracle({asset: address(9), svrOracle: address(100)});
-
-    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
-    steward.configureOracle(config);
   }
 }

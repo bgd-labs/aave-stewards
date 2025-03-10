@@ -16,6 +16,7 @@ interface ISvrOracleSteward {
   error NoSvrOracleConfigured();
   error NoCachedOracle();
   error ZeroAddress();
+  // The steweard assumes 8 decimal oracles. If a different oracle is passed it will revert.
   error InvalidOracleDecimals();
 
   /**
@@ -31,12 +32,6 @@ interface ISvrOracleSteward {
   function getOracleConfig(address asset) external view returns (address, address);
 
   /**
-   * @notice Updates or adds a svrOracle for a selected asset.
-   * @param configInput A configuration input struct containing the asset and svrOracle.
-   */
-  function configureOracle(AssetOracle calldata configInput) external;
-
-  /**
    * @notice Removes an oracle configuration.
    * @param asset The asset to remove.
    */
@@ -44,13 +39,13 @@ interface ISvrOracleSteward {
 
   /**
    * @notice Enables a previously configured svrOracle.
-   * @param asset Address of the asset for which to enable the svrOracle for.
+   * @param configInput An array of asset, svrOracle configurations.
    * @dev An oracle can only be enabed, when:
    * - it was previously configured
    * - the price deviation compared to the current oracle is within bounds
    * - the current oracle is still the one that was configured when the svrOracle was configured
    */
-  function enableSvrOracle(address asset) external;
+  function enableSvrOracles(AssetOracle[] calldata configInput) external;
 
   /**
    * @notice Disables a previously configured svrOracle.
