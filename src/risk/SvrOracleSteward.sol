@@ -17,7 +17,7 @@ import {ISvrOracleSteward} from "./interfaces/ISvrOracleSteward.sol";
  * --- Security considerations
  *
  * The contract requires the "AssetListing" or "PoolAdmin" role in order to be able to replace oracles.
- * Due to the narrow scope of the contract ifself, only oracles can be replaces, no other role permissions can be exercised.
+ * Due to the narrow scope of the contract itself, only oracles can be replaced, without any extra functionality
  *
  * The owner role which will be assigned to the governance short executor can enable new svrOracles.
  * The guardian role can revert the configuration to the previous oracle.
