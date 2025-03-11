@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 
+import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
 import {GovV3Helpers} from "aave-helpers/src/GovV3Helpers.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -35,7 +36,7 @@ contract OracleMock {
 
 contract SvrOracleStewardBaseTest is Test {
   SvrOracleSteward internal steward;
-  address guardian = address(1);
+  address guardian = MiscEthereum.PROTOCOL_GUARDIAN;
   address owner = AaveV3Ethereum.ACL_ADMIN;
 
   address constant cbBTC_SVR_ORACLE = 0x77E55306eeDb1F94a4DcFbAa6628ef87586BC651;
