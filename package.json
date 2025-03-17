@@ -1,0 +1,22 @@
+{
+  "name": "aave-stewards",
+  "version": "1.0.0",
+  "description": "Aave stewards are utility contracts that allow a permissioned entity to perform tasks on behalf of the Aave DAO.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "repayBatch": "src/ts/clinic_repayBatch.ts"
+  },
+  "author": "BGD Labs",
+  "license": "MIT",
+  "dependencies": {
+    "@bgd-labs/aave-address-book": "^4.16.0",
+    "@bgd-labs/rpc-env": "^2.3.2",
+    "@types/node": "^22.13.10",
+    "viem": "^2.23.11"
+  }
+}
