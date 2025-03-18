@@ -15,14 +15,38 @@ import {
   getContract,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrum } from "viem/chains";
+import {
+  arbitrum,
+  avalanche,
+  base,
+  bsc,
+  gnosis,
+  linea,
+  mainnet,
+  metis,
+  optimism,
+  polygon,
+} from "viem/chains";
 import { getRPCUrl } from "@bgd-labs/rpc-env";
-import { AaveV3Arbitrum } from "@bgd-labs/aave-address-book";
+import {
+  AaveV3Arbitrum,
+  AaveV3Ethereum,
+  AaveV3Optimism,
+  AaveV3EthereumLido,
+  AaveV3BNB,
+  AaveV3Base,
+  AaveV3Avalanche,
+  AaveV3Polygon,
+  AaveV3Gnosis,
+  AaveV3Metis,
+  AaveV3Linea,
+} from "@bgd-labs/aave-address-book";
 import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
+import { decodeUserConfiguration } from "@bgd-labs/toolbox";
 
-const chain = arbitrum;
-const pool = AaveV3Arbitrum;
+const chain = linea;
+const pool = AaveV3Linea;
 // This is not the chain block gas limit, but a rough number on how much gas the txn should consume
 const blockGasLimit = 5_000_000;
 // This is a rough estimate on how much txns should be included in one batch
@@ -69,12 +93,19 @@ async function repayBatch() {
         .filter((u) => u.pool === pool.POOL && chain.id === u.chain_id)
         .map(async (user) => {
           const data = await poolContract.read.getUserAccountData([user.user]);
-          return { ...user, hf: data[5] };
+          const { collateralAssetIds, borrowedAssetIds } =
+            decodeUserConfiguration(
+              (await poolContract.read.getUserConfiguration([user.user])).data,
+            );
+          return { ...user, hf: data[5], collateralAssetIds, borrowedAssetIds };
         }),
     )
   ).filter((x) => {
-    if (x.hf > 0) console.log(`api error ${x.user} has no pure bad debt`);
-    else return true;
+    if (x.borrowedAssetIds.length == 0) {
+      console.log(`data inconsistency ${x.user}`);
+      return false;
+    }
+    return true;
   });
   const aggregatedUsers = filteredUsers.reduce(
     (acc, val) => {
