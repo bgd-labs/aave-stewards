@@ -39,19 +39,19 @@ import { getRPCUrl } from "@bgd-labs/rpc-env";
 import { privateKeyToAccount } from "viem/accounts";
 
 export const CHAIN_POOL_MAP = [
-  // { chain: linea, pool: AaveV3Linea }, has no positions
-  // { chain: arbitrum, pool: AaveV3Arbitrum },
-  // { chain: avalanche, pool: AaveV3Avalanche },
-  // { chain: base, pool: AaveV3Base },
-  // { chain: bsc, pool: AaveV3BNB },
-  // { chain: gnosis, pool: AaveV3Gnosis },
-  // { chain: mainnet, pool: AaveV3Ethereum },
-  // { chain: mainnet, pool: AaveV3EthereumLido },
-  { chain: metis, pool: AaveV3Metis },
-  // { chain: scroll, pool: AaveV3Scroll },
-  // { chain: polygon, pool: AaveV3Polygon },
-  // { chain: optimism, pool: AaveV3Optimism },
-  // { chain: zksync, pool: AaveV3ZkSync }, has no positions
+  // { chain: linea, pool: AaveV3Linea, txType: "eip1559" }, has no positions
+  // { chain: arbitrum, pool: AaveV3Arbitrum, txType: "eip1559" },
+  // { chain: avalanche, pool: AaveV3Avalanche, txType: "eip1559" },
+  // { chain: base, pool: AaveV3Base, txType: "eip1559" },
+  // { chain: bsc, pool: AaveV3BNB, txType: "eip1559" },
+  // { chain: gnosis, pool: AaveV3Gnosis , txType: "eip1559"},
+  // { chain: mainnet, pool: AaveV3Ethereum, txType: "eip1559" },
+  // { chain: mainnet, pool: AaveV3EthereumLido, txType: "eip1559" },
+  { chain: metis, pool: AaveV3Metis, txType: "legacy" },
+  // { chain: scroll, pool: AaveV3Scroll, txType: "eip1559" },
+  // { chain: polygon, pool: AaveV3Polygon, txType: "eip1559" },
+  // { chain: optimism, pool: AaveV3Optimism, txType: "eip1559" },
+  // { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559" }, has no positions
 ];
 // This is not the chain block gas limit, but a rough number on how much gas the txn should consume
 export const blockGasLimit = 6_000_000;

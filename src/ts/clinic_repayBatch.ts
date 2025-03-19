@@ -22,7 +22,7 @@ function getGasLimit(txns: number) {
   return BigInt(400_000 + txns * 120_000);
 }
 
-for (const { chain, pool } of CHAIN_POOL_MAP) {
+for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
   const { account, walletClient } = getOperator(chain);
 
   const poolContract = getContract({
@@ -103,7 +103,7 @@ for (const { chain, pool } of CHAIN_POOL_MAP) {
             functionName: "batchRepayBadDebt",
             // last parameter determines if aTokens should be used for the repayment
             args: params,
-            type: "eip1559",
+            type: txType,
             gas: actualGas,
           });
           console.log("simulation succeeded");
@@ -111,6 +111,7 @@ for (const { chain, pool } of CHAIN_POOL_MAP) {
             console.log("trying to execute repayment");
             const hash = await walletClient.writeContract({
               ...request,
+              account,
               gas: actualGas,
             });
             await walletClient.waitForTransactionReceipt({
