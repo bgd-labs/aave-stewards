@@ -40,10 +40,10 @@ export const CHAIN_POOL_MAP = [
   // { chain: avalanche, pool: AaveV3Avalanche },
   // { chain: base, pool: AaveV3Base },
   // { chain: bsc, pool: AaveV3BNB },
-  { chain: gnosis, pool: AaveV3Gnosis },
+  // { chain: gnosis, pool: AaveV3Gnosis },
   // { chain: mainnet, pool: AaveV3Ethereum },
   // { chain: mainnet, pool: AaveV3EthereumLido },
-  // { chain: metis, pool: AaveV3Metis },
+  { chain: metis, pool: AaveV3Metis },
   // { chain: polygon, pool: AaveV3Polygon },
   // { chain: optimism, pool: AaveV3Optimism },
 ];

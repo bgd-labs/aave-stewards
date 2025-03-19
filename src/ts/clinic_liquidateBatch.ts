@@ -10,7 +10,7 @@ import { IClinicSteward_ABI } from "./abis/IClinicSteward";
 
 const maxLiquidationsPerTx = Math.floor((blockGasLimit - 500_000) / 300_000);
 for (const { chain, pool } of CHAIN_POOL_MAP) {
-  const { account, walletClient } = getOperator(chain);
+  const { walletClient } = getOperator(chain);
 
   const poolContract = getContract({
     abi: IPool_ABI,
@@ -56,7 +56,18 @@ for (const { chain, pool } of CHAIN_POOL_MAP) {
     );
     for (const debt of Object.keys(aggregatedUsers)) {
       for (const collateral of Object.keys(aggregatedUsers[debt])) {
-        let liquidateBatch: Address[] = aggregatedUsers[debt][collateral];
+        let liquidateBatch: Address[] = (
+          await Promise.all(
+            aggregatedUsers[debt][collateral].map(async (user) => {
+              const data = await poolContract.read.getUserAccountData([user]);
+              // debt to small
+              if (data[0] == 0n) return;
+              // healthy
+              if (data[5] > BigInt(1e18)) return;
+              return user;
+            }),
+          )
+        ).filter((u) => u);
         if (liquidateBatch.length > maxLiquidationsPerTx) {
           console.log(
             "chunking the repayment in multiple parts, please rerun the script in a few minutes once the db is updated",
