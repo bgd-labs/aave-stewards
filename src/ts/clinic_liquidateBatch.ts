@@ -50,9 +50,9 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
         );
         if (!debt || !collateral) return acc;
         if (!acc[debt.reserve]) acc[debt.reserve] = {};
-        else if (!acc[debt.reserve][collateral.reserve])
-          acc[debt.reserve][collateral.reserve] = [value.user];
-        else acc[debt.reserve][collateral.reserve].push(value.user);
+        if (!acc[debt.reserve][collateral.reserve])
+          acc[debt.reserve][collateral.reserve] = [];
+        acc[debt.reserve][collateral.reserve].push(value.user);
         return acc;
       },
       {} as Record<Address, Record<Address, Address[]>>,
