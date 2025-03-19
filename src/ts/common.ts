@@ -10,6 +10,7 @@ import {
   optimism,
   polygon,
   zksync,
+  scroll,
 } from "viem/chains";
 import {
   Chain,
@@ -31,10 +32,11 @@ import {
   AaveV3Gnosis,
   AaveV3Metis,
   AaveV3Linea,
+  AaveV3ZkSync,
+  AaveV3Scroll,
 } from "@bgd-labs/aave-address-book";
 import { getRPCUrl } from "@bgd-labs/rpc-env";
 import { privateKeyToAccount } from "viem/accounts";
-import { AaveV3ZkSync } from "@bgd-labs/aave-address-book";
 
 export const CHAIN_POOL_MAP = [
   // { chain: linea, pool: AaveV3Linea }, has no positions
@@ -46,6 +48,7 @@ export const CHAIN_POOL_MAP = [
   // { chain: mainnet, pool: AaveV3Ethereum },
   // { chain: mainnet, pool: AaveV3EthereumLido },
   { chain: metis, pool: AaveV3Metis },
+  // { chain: scroll, pool: AaveV3Scroll },
   // { chain: polygon, pool: AaveV3Polygon },
   // { chain: optimism, pool: AaveV3Optimism },
   // { chain: zksync, pool: AaveV3ZkSync }, has no positions
