@@ -12,8 +12,8 @@ const maxLiquidationsPerTx = Math.floor((blockGasLimit - 500_000) / 300_000);
 function getGasLimit(txns: number) {
   return BigInt(600_000 + txns * 350_000);
 }
-for (const { chain, pool } of CHAIN_POOL_MAP) {
-  const { walletClient } = getOperator(chain);
+for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
+  const { walletClient, account } = getOperator(chain);
 
   const poolContract = getContract({
     abi: IPool_ABI,
@@ -97,11 +97,12 @@ for (const { chain, pool } of CHAIN_POOL_MAP) {
               functionName: "batchLiquidate",
               // last parameter determines if aTokens should be used for the repayment
               args: params,
-              type: "eip1559",
+              type: txType,
               gas: actualGas,
             });
             const hash = await walletClient.writeContract({
               ...request,
+              account,
               gas: actualGas,
             });
             await walletClient.waitForTransactionReceipt({

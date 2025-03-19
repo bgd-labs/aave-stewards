@@ -52,7 +52,7 @@ export const CHAIN_POOL_MAP = [
   // { chain: polygon, pool: AaveV3Polygon, txType: "eip1559" },
   // { chain: optimism, pool: AaveV3Optimism, txType: "eip1559" },
   // { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559" }, has no positions
-];
+] as const;
 // This is not the chain block gas limit, but a rough number on how much gas the txn should consume
 export const blockGasLimit = 6_000_000;
 
