@@ -12,6 +12,7 @@ import {ClinicSteward} from "../../../src/maintenance/ClinicSteward.sol";
 
 import {ClinicStewardBaseTest} from "../../maintenance/ClinicSteward.t.sol";
 
+/// forge-config: default.isolate = true
 contract ClinicStewardGasTest is ClinicStewardBaseTest {
   function test_getBadDebtAmount_zero_users() public {
     _callGetBadDebtAmountWithNumberOfUsers(0);
