@@ -9,6 +9,7 @@ import {
   metis,
   optimism,
   polygon,
+  zksync,
 } from "viem/chains";
 import {
   Chain,
@@ -33,19 +34,21 @@ import {
 } from "@bgd-labs/aave-address-book";
 import { getRPCUrl } from "@bgd-labs/rpc-env";
 import { privateKeyToAccount } from "viem/accounts";
+import { AaveV3ZkSync } from "@bgd-labs/aave-address-book";
 
 export const CHAIN_POOL_MAP = [
-  // { chain: linea, pool: AaveV3Linea },
+  // { chain: linea, pool: AaveV3Linea }, has no positions
   // { chain: arbitrum, pool: AaveV3Arbitrum },
   // { chain: avalanche, pool: AaveV3Avalanche },
   // { chain: base, pool: AaveV3Base },
   // { chain: bsc, pool: AaveV3BNB },
-  // { chain: gnosis, pool: AaveV3Gnosis },
+  { chain: gnosis, pool: AaveV3Gnosis },
   // { chain: mainnet, pool: AaveV3Ethereum },
   // { chain: mainnet, pool: AaveV3EthereumLido },
-  { chain: metis, pool: AaveV3Metis },
+  // { chain: metis, pool: AaveV3Metis },
   // { chain: polygon, pool: AaveV3Polygon },
   // { chain: optimism, pool: AaveV3Optimism },
+  // { chain: zksync, pool: AaveV3ZkSync }, has no positions
 ];
 // This is not the chain block gas limit, but a rough number on how much gas the txn should consume
 export const blockGasLimit = 6_000_000;

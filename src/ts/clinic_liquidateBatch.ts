@@ -9,6 +9,9 @@ import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
 
 const maxLiquidationsPerTx = Math.floor((blockGasLimit - 500_000) / 300_000);
+function getGasLimit(txns: number) {
+  return BigInt(600_000 + txns * 350_000);
+}
 for (const { chain, pool } of CHAIN_POOL_MAP) {
   const { walletClient } = getOperator(chain);
 
@@ -68,45 +71,47 @@ for (const { chain, pool } of CHAIN_POOL_MAP) {
             }),
           )
         ).filter((u) => u);
-        if (liquidateBatch.length > maxLiquidationsPerTx) {
+        if (liquidateBatch.length) {
+          if (liquidateBatch.length > maxLiquidationsPerTx) {
+            console.log(
+              "chunking the repayment in multiple parts, please rerun the script in a few minutes once the db is updated",
+            );
+            liquidateBatch = liquidateBatch.slice(0, maxLiquidationsPerTx);
+          }
           console.log(
-            "chunking the repayment in multiple parts, please rerun the script in a few minutes once the db is updated",
+            `liquidating ${aggregatedUsers[debt][collateral].length} users with debt ${debt} and collateral ${collateral}`,
           );
-          liquidateBatch = liquidateBatch.slice(0, maxLiquidationsPerTx);
-        }
-        console.log(
-          `liquidating ${aggregatedUsers[debt][collateral].length} users with debt ${debt} and collateral ${collateral}`,
-        );
-        const params = [
-          debt as Address,
-          collateral as Address,
-          liquidateBatch,
-          true,
-        ] as const;
-        // slightly overestimate the gas, just to be sure
-        const actualGas = BigInt(Math.floor(blockGasLimit * 1.2));
-        try {
-          const { request } = await walletClient.simulateContract({
-            account: botAddress,
-            address: pool.CLINIC_STEWARD,
-            abi: IClinicSteward_ABI,
-            functionName: "batchLiquidate",
-            // last parameter determines if aTokens should be used for the repayment
-            args: params,
-            type: "eip1559",
-            gas: actualGas,
-          });
-          const hash = await walletClient.writeContract({
-            ...request,
-            gas: actualGas,
-          });
-          await walletClient.waitForTransactionReceipt({
-            confirmations: 5,
-            hash,
-          });
-          console.log("transaction confirmed");
-        } catch (e) {
-          console.log(`Error simulating ${params}`);
+          const params = [
+            debt as Address,
+            collateral as Address,
+            liquidateBatch,
+            true,
+          ] as const;
+          // slightly overestimate the gas, just to be sure
+          const actualGas = getGasLimit(liquidateBatch.length);
+          try {
+            const { request } = await walletClient.simulateContract({
+              account: botAddress,
+              address: pool.CLINIC_STEWARD,
+              abi: IClinicSteward_ABI,
+              functionName: "batchLiquidate",
+              // last parameter determines if aTokens should be used for the repayment
+              args: params,
+              type: "eip1559",
+              gas: actualGas,
+            });
+            const hash = await walletClient.writeContract({
+              ...request,
+              gas: actualGas,
+            });
+            await walletClient.waitForTransactionReceipt({
+              confirmations: 5,
+              hash,
+            });
+            console.log("transaction confirmed");
+          } catch (e) {
+            console.log(`Error simulating ${params}`);
+          }
         }
       }
     }

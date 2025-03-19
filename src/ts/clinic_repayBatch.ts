@@ -18,6 +18,10 @@ import {
 
 // This is a rough estimate on how much txns should be included in one batch
 const maxRepaymentsPerTx = Math.floor(blockGasLimit / 80_000);
+function getGasLimit(txns: number) {
+  return BigInt(400_000 + txns * 120_000);
+}
+
 for (const { chain, pool } of CHAIN_POOL_MAP) {
   const { account, walletClient } = getOperator(chain);
 
@@ -74,40 +78,46 @@ for (const { chain, pool } of CHAIN_POOL_MAP) {
     );
     for (const reserve of Object.keys(aggregatedUsers)) {
       let repayBatch: Address[] = aggregatedUsers[reserve];
-      if (repayBatch.length > maxRepaymentsPerTx) {
+      if (repayBatch.length) {
+        if (repayBatch.length > maxRepaymentsPerTx) {
+          console.log(
+            "chunking the repayment in multiple parts, please rerun the script in a few minutes once the db is updated",
+          );
+          repayBatch = repayBatch.slice(0, maxRepaymentsPerTx);
+        }
         console.log(
-          "chunking the repayment in multiple parts, please rerun the script in a few minutes once the db is updated",
+          `repaying on behalf of ${repayBatch.length} users on ${chain.name}`,
         );
-        repayBatch = repayBatch.slice(0, maxRepaymentsPerTx);
-      }
-      console.log(
-        `repaying on behalf of ${repayBatch.length} users on ${chain.name}`,
-      );
-      const params = [reserve as Hex, aggregatedUsers[reserve], true] as const;
-      // slightly overestimate the gas, just to be sure
-      const actualGas = BigInt(Math.floor(blockGasLimit * 1.2));
-      try {
-        const { request } = await walletClient.simulateContract({
-          account: botAddress,
-          address: pool.CLINIC_STEWARD,
-          abi: IClinicSteward_ABI,
-          functionName: "batchRepayBadDebt",
-          // last parameter determines if aTokens should be used for the repayment
-          args: params,
-          type: "eip1559",
-          gas: actualGas,
-        });
-        const hash = await walletClient.writeContract({
-          ...request,
-          gas: actualGas,
-        });
-        await walletClient.waitForTransactionReceipt({
-          confirmations: 5,
-          hash,
-        });
-        console.log("transaction confirmed");
-      } catch (e) {
-        console.log(`Error simulating ${params}`);
+        const params = [
+          reserve as Hex,
+          aggregatedUsers[reserve],
+          true,
+        ] as const;
+        // slightly overestimate the gas, just to be sure
+        const actualGas = getGasLimit(repayBatch.length);
+        try {
+          const { request, result } = await walletClient.simulateContract({
+            account: botAddress,
+            address: pool.CLINIC_STEWARD,
+            abi: IClinicSteward_ABI,
+            functionName: "batchRepayBadDebt",
+            // last parameter determines if aTokens should be used for the repayment
+            args: params,
+            type: "eip1559",
+            gas: actualGas,
+          });
+          // const hash = await walletClient.writeContract({
+          //   ...request,
+          //   gas: actualGas,
+          // });
+          // await walletClient.waitForTransactionReceipt({
+          //   confirmations: 5,
+          //   hash,
+          // });
+          console.log("transaction confirmed");
+        } catch (e) {
+          console.log(`Error simulating ${params}`);
+        }
       }
     }
   }
