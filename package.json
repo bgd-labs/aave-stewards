@@ -9,7 +9,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "repayBatch": "bun src/ts/clinic_repayBatch.ts"
+    "repayBatch": "bun src/ts/clinic_repayBatch.ts",
+    "liquidateBatch": "bun src/ts/clinic_liquidateBatch.ts"
   },
   "author": "BGD Labs",
   "license": "MIT",
