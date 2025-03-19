@@ -100,16 +100,22 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
               type: txType,
               gas: actualGas,
             });
-            const hash = await walletClient.writeContract({
-              ...request,
-              account,
-              gas: actualGas,
-            });
-            await walletClient.waitForTransactionReceipt({
-              confirmations: 5,
-              hash,
-            });
-            console.log("transaction confirmed");
+            console.log("simulation succeeded");
+            try {
+              console.log("trying to execute liquidation");
+              const hash = await walletClient.writeContract({
+                ...request,
+                account,
+                gas: actualGas,
+              });
+              await walletClient.waitForTransactionReceipt({
+                confirmations: 5,
+                hash,
+              });
+              console.log("transaction confirmed");
+            } catch (e) {
+              console.log(e);
+            }
           } catch (e) {
             console.log(`Error simulating ${params}`);
           }
