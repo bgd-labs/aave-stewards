@@ -44,9 +44,9 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
     ).json();
     const aggregatedUsers = users.hfWithPositions.reduce(
       (acc, value) => {
-        const debt = value.positions.find((p) => p.scaled_variable_debt != 0);
+        const debt = value.positions.find((p) => p.scaled_variable_debt);
         const collateral = value.positions.find(
-          (p) => p.using_as_collateral == true && p.scaled_a_token_balance != 0,
+          (p) => p.using_as_collateral && p.scaled_a_token_balance,
         );
         if (!debt || !collateral) return acc;
         if (!acc[debt.reserve]) acc[debt.reserve] = {};
@@ -57,6 +57,8 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
       },
       {} as Record<Address, Record<Address, Address[]>>,
     );
+    console.log(aggregatedUsers);
+    return;
     for (const debt of Object.keys(aggregatedUsers)) {
       for (const collateral of Object.keys(aggregatedUsers[debt])) {
         let liquidateBatch: Address[] = (
