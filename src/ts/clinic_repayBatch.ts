@@ -117,10 +117,10 @@ for (const { chain, pool } of CHAIN_POOL_MAP) {
               confirmations: 5,
               hash,
             });
+            console.log("transaction confirmed");
           } catch (e) {
             console.log(e);
           }
-          console.log("transaction confirmed");
         } catch (e) {
           console.log(`Error simulating ${params}`);
         }
