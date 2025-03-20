@@ -11,9 +11,9 @@ import { ChainId } from "@bgd-labs/rpc-env";
 import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
 const base = 500_000;
-const maxLiquidationsPerTx = Math.floor((blockGasLimit - base) / 300_000);
+const maxLiquidationsPerTx = Math.floor((blockGasLimit - base) / 210_000);
 function getGasLimit(txns: number) {
-  return BigInt((base + txns * 300_000) * 1.2);
+  return BigInt((base + txns * 210_000) * 1.2);
 }
 for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
   console.log(`######### Starting on ${chain.name} #########`);
