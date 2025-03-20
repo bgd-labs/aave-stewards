@@ -40,7 +40,7 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
       ];
     } = await (
       await fetch(
-        `https://api.onaave.com/healthFactor/get?chainId=${chain.id}&pool=${pool.POOL}&page=1&pageSize=5000`,
+        `https://api.onaave.com/healthFactor/get?chainId=${chain.id}&pool=${pool.POOL}&page=1&pageSize=10000`,
       )
     ).json();
     const aggregatedUsers = users.hfWithPositions.reduce(
