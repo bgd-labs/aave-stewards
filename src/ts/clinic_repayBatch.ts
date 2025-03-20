@@ -26,6 +26,7 @@ function getGasLimit(txns: number) {
 }
 
 for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
+  console.log(`######### Starting on ${chain.name} #########`);
   const { account, walletClient } = getOperator(chain);
 
   const poolContract = getContract({

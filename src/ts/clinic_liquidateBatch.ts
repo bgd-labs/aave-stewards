@@ -8,13 +8,27 @@ import {
 import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
 import { ChainId } from "@bgd-labs/rpc-env";
+import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
-const maxLiquidationsPerTx = Math.floor((blockGasLimit - 500_000) / 300_000);
+const base = 500_000;
+const maxLiquidationsPerTx = Math.floor((blockGasLimit - base) / 300_000);
 function getGasLimit(txns: number) {
-  return BigInt(600_000 + txns * 350_000);
+  return BigInt((base + txns * 300_000) * 1.2);
 }
 for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
+  console.log(`######### Starting on ${chain.name} #########`);
   const { walletClient, account } = getOperator(chain);
+  const prices: {
+    timestamp: number;
+    tokenPrices: {
+      chainId: number;
+      token: string;
+      latestAnswer: string;
+      decimals: number;
+    }[];
+  } = await (
+    await fetch("https://api.onaave.com/v4/markets/hot?timestamp=0")
+  ).json();
 
   const poolContract = getContract({
     abi: IPool_ABI,
@@ -45,15 +59,38 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
     ).json();
     const aggregatedUsers = users.hfWithPositions.reduce(
       (acc, value) => {
-        const debt = value.positions.find(
-          (p) => p.scaledVariableDebt && p.scaledVariableDebt !== "0",
-        );
-        const collateral = value.positions.find(
-          (p) =>
-            p.usingAsCollateral &&
-            p.scaledATokenBalance &&
-            p.scaledATokenBalance !== "0",
-        );
+        const debt = value.positions.find((p) => {
+          if (!p.scaledVariableDebt) return false;
+          if (p.scaledVariableDebt === "0") return false;
+          const debtPrice = prices.tokenPrices.find(
+            (t) => t.token === p.reserve,
+          )!;
+          const asset = Object.values(pool.ASSETS).find(
+            (a) => a.UNDERLYING === p.reserve,
+          );
+          const value =
+            (BigInt(debtPrice.latestAnswer) * BigInt(p.scaledVariableDebt)) /
+            1n ** BigInt(asset.decimals);
+          if (value == 0n) return false;
+          return true;
+        });
+        const collateral = value.positions.find((p) => {
+          if (!p.usingAsCollateral) return false;
+          if (!p.scaledATokenBalance) return false;
+          if (p.scaledATokenBalance === "0") return false;
+          const collateralPrice = prices.tokenPrices.find(
+            (t) => t.token === p.reserve,
+          )!;
+          const asset = Object.values(pool.ASSETS).find(
+            (a) => a.UNDERLYING === p.reserve,
+          );
+          const value =
+            (BigInt(collateralPrice.latestAnswer) *
+              BigInt(p.scaledATokenBalance)) /
+            1n ** BigInt(asset.decimals);
+          if (value == 0n) return false;
+          return true;
+        });
         if (!debt || !collateral) return acc;
         if (!acc[debt.reserve]) acc[debt.reserve] = {};
         if (!acc[debt.reserve][collateral.reserve])
@@ -85,13 +122,13 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
             liquidateBatch = liquidateBatch.slice(0, maxLiquidationsPerTx);
           }
           console.log(
-            `liquidating ${aggregatedUsers[debt][collateral].length} users with debt ${debt} and collateral ${collateral}`,
+            `liquidating ${liquidateBatch.length} users with debt ${debt} and collateral ${collateral}`,
           );
           const params = [
             debt as Address,
             collateral as Address,
             liquidateBatch,
-            true,
+            debt === AaveV3Ethereum.ASSETS.GHO.UNDERLYING ? false : true,
           ] as const;
           // slightly overestimate the gas, just to be sure
           const actualGas = getGasLimit(liquidateBatch.length);
