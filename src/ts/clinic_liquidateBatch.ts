@@ -114,24 +114,19 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
             }),
           )
         ).filter((u) => u);
-        if (liquidateBatch.length) {
-          if (liquidateBatch.length > maxLiquidationsPerTx) {
-            console.log(
-              "chunking the repayment in multiple parts, please rerun the script in a few minutes once the db is updated",
-            );
-            liquidateBatch = liquidateBatch.slice(0, maxLiquidationsPerTx);
-          }
+
+        async function liquidate(batch: Address[]) {
           console.log(
-            `liquidating ${liquidateBatch.length} users with debt ${debt} and collateral ${collateral}`,
+            `liquidating ${batch.length} users with debt ${debt} and collateral ${collateral}`,
           );
           const params = [
             debt as Address,
             collateral as Address,
-            liquidateBatch,
+            batch,
             debt === AaveV3Ethereum.ASSETS.GHO.UNDERLYING ? false : true,
           ] as const;
           // slightly overestimate the gas, just to be sure
-          const actualGas = getGasLimit(liquidateBatch.length);
+          const actualGas = getGasLimit(batch.length);
           try {
             const { request } = await walletClient.simulateContract({
               account: botAddress,
@@ -176,6 +171,15 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
             }
           } catch (e) {
             console.log(`Error simulating ${params}`);
+          }
+        }
+        if (liquidateBatch.length) {
+          if (liquidateBatch.length > maxLiquidationsPerTx) {
+            while (liquidateBatch.length != 0) {
+              await liquidate(liquidateBatch.splice(0, maxLiquidationsPerTx));
+            }
+          } else {
+            await liquidate(liquidateBatch);
           }
         }
       }
