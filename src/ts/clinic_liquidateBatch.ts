@@ -1,22 +1,21 @@
 import { Address, Chain, encodeFunctionData, getContract, Hex } from "viem";
-import {
-  blockGasLimit,
-  botAddress,
-  CHAIN_POOL_MAP,
-  getOperator,
-} from "./common";
+import { botAddress, CHAIN_POOL_MAP, getOperator } from "./common";
 import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
 import { ChainId } from "@bgd-labs/rpc-env";
 import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
-const base = 500_000;
-const maxLiquidationsPerTx = Math.floor((blockGasLimit - base) / 210_000);
-function getGasLimit(txns: number) {
-  return BigInt((base + txns * 210_000) * 1.2);
-}
-for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
+for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
+  const blockGasLimit = (BigInt(gasLimit) * 50n) / 100n;
+  const base = 500_000;
+  const maxLiquidationsPerTx = Math.floor(
+    (Number(blockGasLimit) - base) / 210_000,
+  );
+  function getGasLimit(txns: number) {
+    return BigInt((base + txns * 210_000) * 1.2);
+  }
   console.log(`######### Starting on ${chain.name} #########`);
+  console.log(`maxGas: ${blockGasLimit}, maxTxn: ${maxLiquidationsPerTx}`);
   const { walletClient, account } = getOperator(chain);
   const prices: {
     timestamp: number;

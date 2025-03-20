@@ -39,22 +39,70 @@ import { getRPCUrl } from "@bgd-labs/rpc-env";
 import { privateKeyToAccount } from "viem/accounts";
 
 export const CHAIN_POOL_MAP = [
-  { chain: linea, pool: AaveV3Linea, txType: "eip1559" },
-  { chain: arbitrum, pool: AaveV3Arbitrum, txType: "eip1559" },
-  { chain: avalanche, pool: AaveV3Avalanche, txType: "eip1559" },
-  { chain: base, pool: AaveV3Base, txType: "eip1559" },
-  { chain: bsc, pool: AaveV3BNB, txType: "eip1559" },
-  { chain: gnosis, pool: AaveV3Gnosis, txType: "eip1559" },
-  { chain: mainnet, pool: AaveV3Ethereum, txType: "eip1559" },
-  { chain: mainnet, pool: AaveV3EthereumLido, txType: "eip1559" },
-  { chain: metis, pool: AaveV3Metis, txType: "legacy" },
-  { chain: polygon, pool: AaveV3Polygon, txType: "eip1559" },
-  { chain: optimism, pool: AaveV3Optimism, txType: "eip1559" },
-  { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559" },
-  { chain: scroll, pool: AaveV3Scroll, txType: "eip1559" },
+  // {
+  //   chain: linea,
+  //   pool: AaveV3Linea,
+  //   txType: "eip1559",
+  //   gasLimit: 30_000_000,
+  // },
+  {
+    chain: arbitrum,
+    pool: AaveV3Arbitrum,
+    txType: "eip1559",
+    gasLimit: 32_000_000,
+  },
+  {
+    chain: avalanche,
+    pool: AaveV3Avalanche,
+    txType: "eip1559",
+    gasLimit: 15_000_000,
+  },
+  { chain: base, pool: AaveV3Base, txType: "eip1559", gasLimit: 116_000_000 },
+  { chain: bsc, pool: AaveV3BNB, txType: "eip1559", gasLimit: 120_000_000 },
+  {
+    chain: gnosis,
+    pool: AaveV3Gnosis,
+    txType: "eip1559",
+    gasLimit: 17_000_000,
+  },
+  {
+    chain: mainnet,
+    pool: AaveV3Ethereum,
+    txType: "eip1559",
+    gasLimit: 34_000_000,
+  },
+  {
+    chain: mainnet,
+    pool: AaveV3EthereumLido,
+    txType: "eip1559",
+    gasLimit: 34_000_000,
+  },
+  {
+    chain: metis,
+    pool: AaveV3Metis,
+    txType: "legacy",
+    gasLimit: 30_000_000,
+  },
+  {
+    chain: polygon,
+    pool: AaveV3Polygon,
+    txType: "eip1559",
+    gasLimit: 30_000_000,
+  },
+  {
+    chain: optimism,
+    pool: AaveV3Optimism,
+    txType: "eip1559",
+    gasLimit: 60_000_000,
+  },
+  // { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559" },
+  {
+    chain: scroll,
+    pool: AaveV3Scroll,
+    txType: "eip1559",
+    gasLimit: 10_000_000,
+  },
 ] as const;
-// This is not the chain block gas limit, but a rough number on how much gas the txn should consume
-export const blockGasLimit = 8_000_000;
 
 export const botAddress = "0x3Cbded22F878aFC8d39dCD744d3Fe62086B76193";
 

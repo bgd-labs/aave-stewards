@@ -9,23 +9,20 @@ import { Hex, Address, getContract } from "viem";
 import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
 import { decodeUserConfiguration } from "@bgd-labs/toolbox";
-import {
-  blockGasLimit,
-  botAddress,
-  CHAIN_POOL_MAP,
-  getOperator,
-} from "./common";
+import { botAddress, CHAIN_POOL_MAP, getOperator } from "./common";
 import { ChainId } from "@bgd-labs/rpc-env";
 import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
-// This is a rough estimate on how much txns should be included in one batch
-const base = 400_000;
-const maxRepaymentsPerTx = Math.floor((blockGasLimit - base) / 95_000);
-function getGasLimit(txns: number) {
-  return BigInt((base + txns * 95_000) * 1.2);
-}
+for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
+  const blockGasLimit = (BigInt(gasLimit) * 50n) / 100n;
+  const base = 400_000;
+  const maxRepaymentsPerTx = Math.floor(
+    (Number(blockGasLimit) - base) / 95_000,
+  );
+  function getGasLimit(txns: number) {
+    return BigInt((base + txns * 95_000) * 1.2);
+  }
 
-for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
   console.log(`######### Starting on ${chain.name} #########`);
   const { account, walletClient } = getOperator(chain);
 
