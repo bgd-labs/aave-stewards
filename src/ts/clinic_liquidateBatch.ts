@@ -69,8 +69,8 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
           await Promise.all(
             aggregatedUsers[debt][collateral].map(async (user) => {
               const data = await poolContract.read.getUserAccountData([user]);
-              // debt to small
-              if (data[0] == 0n) return;
+              // debt or collateral to small
+              if (data[0] == 0n || data[1] == 0n) return;
               // healthy
               if (data[5] > BigInt(1e18)) return;
               return user;

@@ -15,11 +15,14 @@ import {
   CHAIN_POOL_MAP,
   getOperator,
 } from "./common";
+import { ChainId } from "@bgd-labs/rpc-env";
+import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
 // This is a rough estimate on how much txns should be included in one batch
-const maxRepaymentsPerTx = Math.floor(blockGasLimit / 80_000);
+const base = 400_000;
+const maxRepaymentsPerTx = Math.floor((blockGasLimit - base) / 95_000);
 function getGasLimit(txns: number) {
-  return BigInt(400_000 + txns * 120_000);
+  return BigInt((base + txns * 95_000) * 1.2);
 }
 
 for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
@@ -44,9 +47,6 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
         users
           .filter((u) => u.pool === pool.POOL && chain.id === u.chain_id)
           .map(async (user) => {
-            const data = await poolContract.read.getUserAccountData([
-              user.user,
-            ]);
             const { collateralAssetIds, borrowedAssetIds } =
               decodeUserConfiguration(
                 (await poolContract.read.getUserConfiguration([user.user]))
@@ -54,8 +54,6 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
               );
             return {
               ...user,
-              collateralBase: data[0],
-              hf: data[5],
               collateralAssetIds,
               borrowedAssetIds,
             };
@@ -90,8 +88,11 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
         );
         const params = [
           reserve as Hex,
-          aggregatedUsers[reserve],
-          true,
+          repayBatch,
+          chain.id === ChainId.mainnet &&
+          reserve === AaveV3Ethereum.ASSETS.GHO.UNDERLYING
+            ? false
+            : true,
         ] as const;
         // slightly overestimate the gas, just to be sure
         const actualGas = getGasLimit(repayBatch.length);
@@ -123,7 +124,7 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
             console.log(request, e);
           }
         } catch (e) {
-          console.log(`Error simulating ${params}`);
+          console.log(`Error simulating ${actualGas} ${params}`);
         }
       }
     }
