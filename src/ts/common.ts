@@ -47,8 +47,8 @@ export const CHAIN_POOL_MAP = [
   // { chain: gnosis, pool: AaveV3Gnosis, txType: "eip1559" },
   // { chain: mainnet, pool: AaveV3Ethereum, txType: "eip1559" },
   // { chain: mainnet, pool: AaveV3EthereumLido, txType: "eip1559" },
-  { chain: metis, pool: AaveV3Metis, txType: "legacy" },
-  // { chain: scroll, pool: AaveV3Scroll, txType: "eip1559" },
+  // { chain: metis, pool: AaveV3Metis, txType: "legacy" },
+  { chain: scroll, pool: AaveV3Scroll, txType: "eip1559" },
   // { chain: polygon, pool: AaveV3Polygon, txType: "eip1559" },
   // { chain: optimism, pool: AaveV3Optimism, txType: "eip1559" },
   // { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559" }, has no positions

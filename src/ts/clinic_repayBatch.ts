@@ -120,7 +120,7 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
             });
             console.log("transaction confirmed");
           } catch (e) {
-            console.log(e);
+            console.log(request, e);
           }
         } catch (e) {
           console.log(`Error simulating ${params}`);

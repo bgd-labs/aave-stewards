@@ -1,4 +1,4 @@
-import { Address, Chain, getContract, Hex } from "viem";
+import { Address, Chain, encodeFunctionData, getContract, Hex } from "viem";
 import {
   blockGasLimit,
   botAddress,
@@ -110,16 +110,17 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
             try {
               if ((chain as Chain).id === ChainId.mainnet) {
                 console.log("mainnet private tx not yet implemented, skipping");
-                // const serializedTransaction = await walletClient.signTransaction({
-                //   ...request,
-                //   account,
-                //   to: pool.CLINIC_STEWARD,
-                // });
-                // await walletClient.sendPrivateTransaction({
-                //   ...request,
-                //   account,
-                //   gas: actualGas,
-                // });
+                await walletClient.sendPrivateTransaction({
+                  from: botAddress,
+                  to: pool.CLINIC_STEWARD,
+                  data: encodeFunctionData({
+                    abi: IClinicSteward_ABI,
+                    functionName: "batchLiquidate",
+                    args: params,
+                  }),
+                  type: txType,
+                  gas: actualGas,
+                });
               } else {
                 console.log("trying to execute liquidation");
                 const hash = await walletClient.writeContract({
