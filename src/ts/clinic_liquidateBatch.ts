@@ -1,4 +1,4 @@
-import { Address, getContract, Hex } from "viem";
+import { Address, Chain, getContract, Hex } from "viem";
 import {
   blockGasLimit,
   botAddress,
@@ -7,6 +7,7 @@ import {
 } from "./common";
 import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
+import { ChainId } from "@bgd-labs/rpc-env";
 
 const maxLiquidationsPerTx = Math.floor((blockGasLimit - 500_000) / 300_000);
 function getGasLimit(txns: number) {
@@ -107,17 +108,31 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
             });
             console.log("simulation succeeded");
             try {
-              console.log("trying to execute liquidation");
-              const hash = await walletClient.writeContract({
-                ...request,
-                account,
-                gas: actualGas,
-              });
-              await walletClient.waitForTransactionReceipt({
-                confirmations: 5,
-                hash,
-              });
-              console.log("transaction confirmed");
+              if ((chain as Chain).id === ChainId.mainnet) {
+                console.log("mainnet private tx not yet implemented, skipping");
+                // const serializedTransaction = await walletClient.signTransaction({
+                //   ...request,
+                //   account,
+                //   to: pool.CLINIC_STEWARD,
+                // });
+                // await walletClient.sendPrivateTransaction({
+                //   ...request,
+                //   account,
+                //   gas: actualGas,
+                // });
+              } else {
+                console.log("trying to execute liquidation");
+                const hash = await walletClient.writeContract({
+                  ...request,
+                  account,
+                  gas: actualGas,
+                });
+                await walletClient.waitForTransactionReceipt({
+                  confirmations: 5,
+                  hash,
+                });
+                console.log("transaction confirmed");
+              }
             } catch (e) {
               console.log(e);
             }

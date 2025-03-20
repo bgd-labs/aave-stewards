@@ -62,7 +62,7 @@ for (const { chain, pool, txType } of CHAIN_POOL_MAP) {
           }),
       )
     ).filter((x) => {
-      if (x.borrowedAssetIds.length == 0 || x.collateralBase != 0n) {
+      if (x.borrowedAssetIds.length == 0 || x.collateralAssetIds.length != 0) {
         // some inconsistency on the api, so we just ignore these ones
         return false;
       }
