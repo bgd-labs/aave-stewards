@@ -146,8 +146,7 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
             try {
               if ((chain as Chain).id === ChainId.mainnet) {
                 console.log("mainnet private tx not yet implemented, skipping");
-                await walletClient.sendPrivateTransaction({
-                  from: botAddress,
+                const hash = await walletClient.sendPrivateTransaction({
                   to: pool.CLINIC_STEWARD,
                   data: encodeFunctionData({
                     abi: IClinicSteward_ABI,
@@ -156,6 +155,10 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
                   }),
                   type: txType,
                   gas: actualGas,
+                });
+                await walletClient.waitForTransactionReceipt({
+                  confirmations: 5,
+                  hash,
                 });
               } else {
                 console.log("trying to execute liquidation");

@@ -19,6 +19,7 @@ import {
   http,
   TransactionRequest,
   publicActions,
+  SendTransactionReturnType,
 } from "viem";
 import {
   AaveV3Arbitrum,
@@ -121,10 +122,10 @@ export function getOperator(chain: Chain) {
     .extend((client) => ({
       async sendPrivateTransaction(args: TransactionRequest) {
         const signed = await client.signTransaction(args);
-        return client.request({
+        return (await client.request({
           method: "eth_sendPrivateTransaction" as any,
           params: [{ tx: signed, preferences: { fast: true } }] as any,
-        });
+        })) as SendTransactionReturnType;
       },
     }))
     .extend(publicActions);
