@@ -14,10 +14,10 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
   const blockGasLimit = getBlockGasLimit(gasLimit);
   const base = 500_000;
   const maxLiquidationsPerTx = Math.floor(
-    (Number(blockGasLimit) - base) / 210_000,
+    (Number(blockGasLimit) - base) / 180_000,
   );
   function getGasLimit(txns: number) {
-    return BigInt((base + txns * 210_000) * 1.2);
+    return BigInt((base + txns * 180_000) * 1.2);
   }
   console.log(`######### Starting on ${chain.name} #########`);
   console.log(`maxGas: ${blockGasLimit}, maxTxn: ${maxLiquidationsPerTx}`);
