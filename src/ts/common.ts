@@ -96,12 +96,12 @@ export const CHAIN_POOL_MAP = [
     gasLimit: 60_000_000,
   },
   // { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559" },
-  // {
-  //   chain: scroll,
-  //   pool: AaveV3Scroll,
-  //   txType: "eip1559",
-  //   gasLimit: 10_000_000,
-  // },
+  {
+    chain: scroll,
+    pool: AaveV3Scroll,
+    txType: "eip1559",
+    gasLimit: 5_000_000,
+  },
 ] as const;
 
 export const botAddress = "0x3Cbded22F878aFC8d39dCD744d3Fe62086B76193";
