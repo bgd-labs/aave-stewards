@@ -75,7 +75,7 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
           const value =
             (BigInt(debtPrice.latestAnswer) * BigInt(p.scaledVariableDebt)) /
             1n ** BigInt(asset.decimals);
-          if (value == 0n) return false;
+          if (value < 2n) return false;
           return true;
         });
         const collateral = value.positions.find((p) => {
@@ -92,7 +92,7 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
             (BigInt(collateralPrice.latestAnswer) *
               BigInt(p.scaledATokenBalance)) /
             1n ** BigInt(asset.decimals);
-          if (value == 0n) return false;
+          if (value < 2n) return false;
           return true;
         });
         if (!debt || !collateral) return acc;
