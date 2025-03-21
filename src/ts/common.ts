@@ -100,7 +100,7 @@ export const CHAIN_POOL_MAP = [
     chain: scroll,
     pool: AaveV3Scroll,
     txType: "eip1559",
-    gasLimit: 5_000_000,
+    gasLimit: 4_000_000,
   },
 ] as const;
 
