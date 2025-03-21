@@ -9,12 +9,17 @@ import { Hex, Address, getContract } from "viem";
 import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
 import { decodeUserConfiguration } from "@bgd-labs/toolbox";
-import { botAddress, CHAIN_POOL_MAP, getOperator } from "./common";
+import {
+  botAddress,
+  CHAIN_POOL_MAP,
+  getBlockGasLimit,
+  getOperator,
+} from "./common";
 import { ChainId } from "@bgd-labs/rpc-env";
 import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
 for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
-  const blockGasLimit = (BigInt(gasLimit) * 50n) / 100n;
+  const blockGasLimit = getBlockGasLimit(gasLimit);
   const base = 400_000;
   const maxRepaymentsPerTx = Math.floor(
     (Number(blockGasLimit) - base) / 95_000,

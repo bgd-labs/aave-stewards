@@ -1,12 +1,17 @@
 import { Address, Chain, encodeFunctionData, getContract, Hex } from "viem";
-import { botAddress, CHAIN_POOL_MAP, getOperator } from "./common";
+import {
+  botAddress,
+  CHAIN_POOL_MAP,
+  getBlockGasLimit,
+  getOperator,
+} from "./common";
 import { IPool_ABI } from "@bgd-labs/aave-address-book/abis";
 import { IClinicSteward_ABI } from "./abis/IClinicSteward";
 import { ChainId } from "@bgd-labs/rpc-env";
 import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
 for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
-  const blockGasLimit = (BigInt(gasLimit) * 50n) / 100n;
+  const blockGasLimit = getBlockGasLimit(gasLimit);
   const base = 500_000;
   const maxLiquidationsPerTx = Math.floor(
     (Number(blockGasLimit) - base) / 210_000,
