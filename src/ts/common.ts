@@ -124,7 +124,6 @@ export function getOperator(chain: Chain) {
     chain: chain,
     transport: http(rpc, {
       onFetchRequest: async (request, init) => {
-        console.log(request.url, init.body);
         if ((init.body as string).includes("eth_sendPrivateTransaction")) {
           const signature = await account.signMessage({
             message: keccak256(toBytes(init.body?.toString()!)),
