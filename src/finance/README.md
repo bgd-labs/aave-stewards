@@ -107,7 +107,7 @@ function cancelSwap(
 ```
 
 This methods cancels a pending trade. Trades should take just a couple of minutes to be picked up and traded, so if something's not right, the user
-should move fast to cancel.
+should assume something's off (bad slippage, market has moved too much), and should probably reach out via Telegram to the COW Swap team who will give extra insights.
 
 Most likely, this function will be called when a swap is not getting executed because slippage might be too tight and there's no match for it.
 

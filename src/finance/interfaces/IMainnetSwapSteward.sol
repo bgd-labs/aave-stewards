@@ -1,9 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 
 interface IMainnetSwapSteward {
+    struct TWAPData {
+        IERC20 sellToken;
+        IERC20 buyToken;
+        address receiver;
+        uint256 partSellAmount; // amount of sellToken to sell in each part
+        uint256 minPartLimit; // minimum amount of tokens to receive per part
+        uint256 t0;
+        uint256 n;
+        uint256 t;
+        uint256 span;
+        bytes32 appData;
+    }
+
     /// @dev Slippage is too high
     error InvalidSlippage();
 
@@ -34,6 +48,16 @@ interface IMainnetSwapSteward {
     /// @param oldAddress The old Milkman instance address
     /// @param newAddress The new Milkman instance address
     event MilkmanAddressUpdated(address oldAddress, address newAddress);
+
+    /// @notice Emitted when the Handler contract address is updated
+    /// @param oldAddress The old Handler instance address
+    /// @param newAddress The new Handler instance address
+    event HandlerAddressUpdated(address oldAddress, address newAddress);
+
+    /// @notice Emitted when the Relayer contract address is updated
+    /// @param oldAddress The old Relayer instance address
+    /// @param newAddress The new Relayer instance address
+    event RelayerAddressUpdated(address oldAddress, address newAddress);
 
     /// @notice Emitted when the Chainlink Price Checker contract address is updated
     /// @param oldAddress The old Price Checker instance address
@@ -88,6 +112,26 @@ interface IMainnetSwapSteward {
         uint256 slippage
     );
 
+    /// @notice Emitted when a TWAP Swap order is cancelled
+    /// @param fromToken The token that was being swapped from
+    /// @param toToken The token that was being swapped for
+    /// @param totalAmount The total amount of fromToken that was going to be swapped
+    event TWAPSwapCanceled(
+        address indexed fromToken,
+        address indexed toToken,
+        uint256 totalAmount
+    );
+
+    /// @notice Emitted when a TWAP Swap order is created
+    /// @param fromToken The token that is being swapped from
+    /// @param toToken The token that is being swapped for
+    /// @param totalAmount The total amount of fromToken that is going to be swapped
+    event TWAPSwapRequested(
+        address indexed fromToken,
+        address indexed toToken,
+        uint256 totalAmount
+    );
+
     /// @notice Emitted when a token's budget is updated
     /// @param token The address of the token
     /// @param budget The budget set for the token
@@ -101,6 +145,12 @@ interface IMainnetSwapSteward {
 
     /// @notice Returns the address of the Milkman contract
     function milkman() external view returns (address);
+
+    /// @notice Returns address of handler of conditional orders
+    function handler() external view returns (address);
+
+    /// @notice Returns address of the relayer to relay conditional orders
+    function relayer() external view returns (address);
 
     /// @notice Returns address of the price checker used for swaps
     function priceChecker() external view returns (address);
@@ -149,6 +199,26 @@ interface IMainnetSwapSteward {
         uint256 amountOut
     ) external;
 
+    /// @notice Function to swap one token for another at a time-weighted-average-price
+    /// @param fromToken Address of the token to swap
+    /// @param toToken Address of the token to receive
+    /// @param sellAmount The amount of tokens to sell per TWAP swap
+    /// @param minPartLimit Minimum amount of toToken to receive per TWAP swap
+    /// @param startTime Timestamp of when TWAP orders start
+    /// @param numParts Number of TWAP swaps to take place (each for sellAmount)
+    /// @param partDuration How long each TWAP takes (ie: hourly, weekly, etc)
+    /// @param span The timeframe the orders can take place in
+    function twapSwap(
+        address fromToken,
+        address toToken,
+        uint256 sellAmount,
+        uint256 minPartLimit,
+        uint256 startTime,
+        uint256 numParts,
+        uint256 partDuration,
+        uint256 span
+    ) external;
+
     /// @notice Function to cancel an existing swap
     /// @param tradeMilkman Address of the Milkman contract created upon order submission
     /// @param fromToken Address of the token to swap from
@@ -185,9 +255,21 @@ interface IMainnetSwapSteward {
     /// @param to The address of MILKMAN
     function setMilkman(address to) external;
 
+    /// @notice Sets the address for the HANDLER used in swaps
+    /// @param to The address of HANDLER
+    function setHandler(address to) external;
+
+    /// @notice Sets the address for the RELAYER used in swaps
+    /// @param to The address of RELAYER
+    function setRelayer(address to) external;
+
     /// @notice Sets the address for the Price checker used in swaps
     /// @param to The address of PRICE_CHECKER
     function setPriceChecker(address to) external;
+
+    /// @notice Sets the address for the Limit Order Price checker used in swaps
+    /// @param to The address of LIMIT_ORDER_PRICE_CHECKER
+    function setLimitOrderPriceChecker(address to) external;
 
     /// @notice Sets a token pair as allowed for swapping in from -> to direction only
     /// @param fromToken The address of the token to swap from

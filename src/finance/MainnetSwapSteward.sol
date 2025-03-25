@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.0;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -6,9 +7,11 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
-import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
+import {ERC1271Forwarder} from "src/finance/ERC1271Forwarder.sol";
 import {IAggregatorInterface} from "src/finance/interfaces/IAggregatorInterface.sol";
+import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
+import {IConditionalOrder} from "src/finance/interfaces/IConditionalOrder.sol";
 import {IMilkman} from "src/finance/interfaces/IMilkman.sol";
 import {IPriceChecker} from "./interfaces/IPriceChecker.sol";
 
@@ -53,7 +56,8 @@ contract MainnetSwapSteward is
     IMainnetSwapSteward,
     OwnableWithGuardian,
     Multicall,
-    RescuableBase
+    RescuableBase,
+    ERC1271Forwarder
 {
     using SafeERC20 for IERC20;
 
@@ -65,6 +69,12 @@ contract MainnetSwapSteward is
 
     /// @inheritdoc IMainnetSwapSteward
     address public milkman;
+
+    /// @inheritdoc IMainnetSwapSteward
+    address public handler;
+
+    /// @inheritdoc IMainnetSwapSteward
+    address public relayer;
 
     /// @inheritdoc IMainnetSwapSteward
     address public priceChecker;
@@ -88,13 +98,23 @@ contract MainnetSwapSteward is
         address collector,
         address initialMilkman,
         address initialPriceChecker,
-        address initialLimitOrderPriceChecker
-    ) OwnableWithGuardian(initialOwner, initialGuardian) {
+        address initialLimitOrderPriceChecker,
+        address initialComposableCow,
+        address initialHandler,
+        address initialRelayer
+    )
+        OwnableWithGuardian(initialOwner, initialGuardian)
+        ERC1271Forwarder(initialComposableCow)
+    {
         if (collector == address(0)) revert InvalidZeroAddress();
+        if (initialHandler == address(0)) revert InvalidZeroAddress();
+        if (initialRelayer == address(0)) revert InvalidZeroAddress();
 
         _setMilkman(initialMilkman);
         _setPriceChecker(initialPriceChecker);
         _setLimitOrderPriceChecker(initialLimitOrderPriceChecker);
+        _setHandler(initialHandler);
+        _setRelayer(initialRelayer);
 
         COLLECTOR = ICollector(collector);
     }
@@ -163,6 +183,47 @@ contract MainnetSwapSteward is
         );
 
         emit LimitSwapRequested(fromToken, toToken, amount, amountOut);
+    }
+
+    /// @inheritdoc IMainnetSwapSteward
+    function twapSwap(
+        address fromToken,
+        address toToken,
+        uint256 sellAmount,
+        uint256 minPartLimit,
+        uint256 startTime,
+        uint256 numParts,
+        uint256 partDuration,
+        uint256 span
+    ) external onlyOwnerOrGuardian {
+        if (fromToken == address(0) || toToken == address(0))
+            revert InvalidZeroAddress();
+        if (sellAmount == 0 || numParts == 0) revert InvalidZeroAmount();
+
+        IMainnetSwapSteward.TWAPData memory twapData = TWAPData(
+            IERC20(fromToken),
+            IERC20(toToken),
+            address(COLLECTOR),
+            sellAmount,
+            minPartLimit,
+            startTime,
+            numParts,
+            partDuration,
+            span,
+            bytes32(0)
+        );
+
+        IConditionalOrder.ConditionalOrderParams
+            memory params = IConditionalOrder.ConditionalOrderParams(
+                IConditionalOrder(handler),
+                "AaveSwapper-TWAP-Swap",
+                abi.encode(twapData)
+            );
+        composableCow.create(params, true);
+
+        IERC20(fromToken).forceApprove(relayer, sellAmount * numParts);
+
+        emit TWAPSwapRequested(fromToken, toToken, sellAmount * numParts);
     }
 
     /// @inheritdoc IMainnetSwapSteward
@@ -258,6 +319,23 @@ contract MainnetSwapSteward is
     /// @inheritdoc IMainnetSwapSteward
     function setPriceChecker(address newPriceChecker) external onlyOwner {
         _setPriceChecker(newPriceChecker);
+    }
+
+    /// @inheritdoc IMainnetSwapSteward
+    function setLimitOrderPriceChecker(
+        address newPriceChecker
+    ) external onlyOwner {
+        _setPriceChecker(newPriceChecker);
+    }
+
+    /// @inheritdoc IMainnetSwapSteward
+    function setHandler(address newHandler) external onlyOwner {
+        _setHandler(newHandler);
+    }
+
+    /// @inheritdoc IMainnetSwapSteward
+    function setRelayer(address newRelayer) external onlyOwner {
+        _setRelayer(newRelayer);
     }
 
     /// @inheritdoc IMainnetSwapSteward
@@ -404,6 +482,24 @@ contract MainnetSwapSteward is
         milkman = newMilkman;
 
         emit MilkmanAddressUpdated(old, newMilkman);
+    }
+
+    /// @dev Internal function to set the Handler instance address
+    function _setHandler(address newHandler) internal {
+        if (newHandler == address(0)) revert InvalidZeroAddress();
+        address old = newHandler;
+        handler = newHandler;
+
+        emit HandlerAddressUpdated(old, newHandler);
+    }
+
+    /// @dev Internal function to set the Relayer instance address
+    function _setRelayer(address newRelayer) internal {
+        if (newRelayer == address(0)) revert InvalidZeroAddress();
+        address old = newRelayer;
+        handler = newRelayer;
+
+        emit RelayerAddressUpdated(old, newRelayer);
     }
 
     /// @dev Internal function to check maximum amount
