@@ -145,7 +145,6 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
             console.log("simulation succeeded");
             try {
               if ((chain as Chain).id === ChainId.mainnet) {
-                console.log("mainnet private tx not yet implemented, skipping");
                 const hash = await walletClient.sendPrivateTransaction({
                   to: pool.CLINIC_STEWARD,
                   data: encodeFunctionData({

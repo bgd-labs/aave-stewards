@@ -20,6 +20,10 @@ import {
   TransactionRequest,
   publicActions,
   SendTransactionReturnType,
+  Address,
+  keccak256,
+  toBytes,
+  toHex,
 } from "viem";
 import {
   AaveV3Arbitrum,
@@ -38,14 +42,15 @@ import {
 } from "@bgd-labs/aave-address-book";
 import { getRPCUrl } from "@bgd-labs/rpc-env";
 import { privateKeyToAccount } from "viem/accounts";
+import { getBlockNumber } from "viem/actions";
 
 export const CHAIN_POOL_MAP = [
-  // {
-  //   chain: linea,
-  //   pool: AaveV3Linea,
-  //   txType: "eip1559",
-  //   gasLimit: 30_000_000,
-  // },
+  {
+    chain: linea,
+    pool: AaveV3Linea,
+    txType: "eip1559",
+    gasLimit: 30_000_000,
+  },
   {
     chain: arbitrum,
     pool: AaveV3Arbitrum,
@@ -96,12 +101,12 @@ export const CHAIN_POOL_MAP = [
     txType: "eip1559",
     gasLimit: 60_000_000,
   },
-  // { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559" },
+  { chain: zksync, pool: AaveV3ZkSync, txType: "eip1559", gasLimit: 5_000_000 },
   {
     chain: scroll,
     pool: AaveV3Scroll,
     txType: "eip1559",
-    gasLimit: 3_000_000,
+    gasLimit: 5_000_000,
   },
 ] as const;
 
@@ -117,15 +122,45 @@ export function getOperator(chain: Chain) {
   const walletClient = createWalletClient({
     account,
     chain: chain,
-    transport: http(rpc),
+    transport: http(rpc, {
+      onFetchRequest: async (request, init) => {
+        console.log(request.url, init.body);
+        if ((init.body as string).includes("eth_sendPrivateTransaction")) {
+          const signature = await account.signMessage({
+            message: keccak256(toBytes(init.body?.toString()!)),
+          });
+          return {
+            ...init,
+            url: "https://relay.flashbots.net",
+            headers: {
+              "X-Flashbots-Signature": `${account.address}:${signature}`,
+            },
+          };
+        }
+      },
+    }),
   })
     .extend((client) => ({
       async sendPrivateTransaction(args: TransactionRequest) {
-        const signed = await client.signTransaction(args);
-        return (await client.request({
+        const request = await client.prepareTransactionRequest(args);
+        const signedTx = await client.signTransaction(request);
+        (await client.request({
           method: "eth_sendPrivateTransaction" as any,
-          params: [{ tx: signed, preferences: { fast: true } }] as any,
+          params: [
+            {
+              tx: signedTx,
+              maxBlockNumber: toHex((await getBlockNumber(client)) + 100n),
+              preferences: {
+                fast: true,
+                privacy: {
+                  hints: ["hash"],
+                  builders: ["flashbots", "beaverbuild.org", "Titan", "rsync"],
+                },
+              },
+            },
+          ] as any,
         })) as SendTransactionReturnType;
+        return keccak256(signedTx);
       },
     }))
     .extend(publicActions);
@@ -134,4 +169,20 @@ export function getOperator(chain: Chain) {
 
 export function getBlockGasLimit(gasLimit: number) {
   return (BigInt(gasLimit) * 40n) / 100n;
+}
+
+export async function refreshUsers(data: {
+  chainId: number;
+  users: Address[];
+}) {
+  const myHeaders = new Headers();
+  myHeaders.append("Content-Type", "application/json");
+
+  await (
+    await fetch("https://api.onaave.com/positions/update", {
+      method: "POST",
+      headers: myHeaders,
+      body: JSON.stringify(data),
+    })
+  ).json();
 }

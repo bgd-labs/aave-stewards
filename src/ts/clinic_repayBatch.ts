@@ -38,29 +38,28 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
   });
 
   async function repayBatch() {
-    const users: {
-      user: Address;
-      chain_id: number;
-      pool: Address;
-      reserve: Address;
-      scaled_variable_debt: string;
-    }[] = await (await fetch("https://api.onaave.com/baddebt/get")).json();
+    const users = (
+      (await (await fetch("https://api.onaave.com/baddebt/get")).json()) as {
+        user: Address;
+        chain_id: number;
+        pool: Address;
+        reserve: Address;
+        scaled_variable_debt: string;
+      }[]
+    ).filter((u) => u.pool === pool.POOL && chain.id === u.chain_id);
     const filteredUsers = (
       await Promise.all(
-        users
-          .filter((u) => u.pool === pool.POOL && chain.id === u.chain_id)
-          .map(async (user) => {
-            const { collateralAssetIds, borrowedAssetIds } =
-              decodeUserConfiguration(
-                (await poolContract.read.getUserConfiguration([user.user]))
-                  .data,
-              );
-            return {
-              ...user,
-              collateralAssetIds,
-              borrowedAssetIds,
-            };
-          }),
+        users.map(async (user) => {
+          const { collateralAssetIds, borrowedAssetIds } =
+            decodeUserConfiguration(
+              (await poolContract.read.getUserConfiguration([user.user])).data,
+            );
+          return {
+            ...user,
+            collateralAssetIds,
+            borrowedAssetIds,
+          };
+        }),
       )
     ).filter((x) => {
       if (x.borrowedAssetIds.length == 0 || x.collateralAssetIds.length != 0) {
@@ -69,6 +68,9 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
       }
       return true;
     });
+    console.log(
+      `${chain.name}: Total users ${users.length}, Filtered: ${filteredUsers.length}`,
+    );
     const aggregatedUsers = filteredUsers.reduce(
       (acc, val) => {
         if (!acc[val.reserve]) acc[val.reserve] = [];
@@ -111,20 +113,22 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
             gas: actualGas,
           });
           console.log("simulation succeeded");
-          try {
-            console.log("trying to execute repayment");
-            const hash = await walletClient.writeContract({
-              ...request,
-              account,
-              gas: actualGas,
-            });
-            await walletClient.waitForTransactionReceipt({
-              confirmations: 5,
-              hash,
-            });
-            console.log("transaction confirmed");
-          } catch (e) {
-            console.log(request, e);
+          if (!process.env.DRY) {
+            try {
+              console.log("trying to execute repayment");
+              const hash = await walletClient.writeContract({
+                ...request,
+                account,
+                gas: actualGas,
+              });
+              await walletClient.waitForTransactionReceipt({
+                confirmations: 5,
+                hash,
+              });
+              console.log("transaction confirmed");
+            } catch (e) {
+              console.log(request, e);
+            }
           }
         } catch (e) {
           console.log(`Error simulating ${actualGas} ${params}`);
