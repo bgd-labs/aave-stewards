@@ -61,7 +61,7 @@ contract MainnetSwapSteward is
     uint256 public constant MAX_SLIPPAGE = 1000; // 10%
 
     /// @inheritdoc IMainnetSwapSteward
-    address public immutable COLLECTOR;
+    ICollector public immutable COLLECTOR;
 
     /// @inheritdoc IMainnetSwapSteward
     address public milkman;
@@ -96,7 +96,7 @@ contract MainnetSwapSteward is
         _setPriceChecker(initialPriceChecker);
         _setLimitOrderPriceChecker(initialLimitOrderPriceChecker);
 
-        COLLECTOR = collector;
+        COLLECTOR = ICollector(collector);
     }
 
     /// @inheritdoc IMainnetSwapSteward
@@ -108,6 +108,7 @@ contract MainnetSwapSteward is
     ) external onlyOwnerOrGuardian {
         address fromOracle = priceOracle[fromToken];
         address toOracle = priceOracle[toToken];
+        amount = _checkAmount(fromToken, amount);
 
         _validateSwap(
             fromToken,
@@ -118,13 +119,13 @@ contract MainnetSwapSteward is
             slippage
         );
 
-        tokenBudget[fromToken] -= amount;
+        amount = _transferTokensIn(fromToken, amount);
 
         _swap(
             priceChecker,
             fromToken,
             toToken,
-            COLLECTOR,
+            address(COLLECTOR),
             amount,
             _getPriceCheckerAndData(fromOracle, toOracle, slippage)
         );
@@ -143,15 +144,20 @@ contract MainnetSwapSteward is
     function limitSwap(
         address fromToken,
         address toToken,
-        address recipient,
         uint256 amount,
         uint256 amountOut
-    ) external onlyOwner {
+    ) external onlyOwnerOrGuardian {
+        amount = _checkAmount(fromToken, amount);
+
+        _validateLimitSwap(fromToken, toToken, amount);
+
+        amount = _transferTokensIn(fromToken, amount);
+
         _swap(
             limitOrderPriceChecker,
             fromToken,
             toToken,
-            recipient,
+            address(COLLECTOR),
             amount,
             abi.encode(amountOut)
         );
@@ -210,7 +216,7 @@ contract MainnetSwapSteward is
 
     /// @inheritdoc IMainnetSwapSteward
     function rescueToken(address token) external {
-        _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
+        _emergencyTokenTransfer(token, address(COLLECTOR), type(uint256).max);
     }
 
     /// @inheritdoc IRescuableBase
@@ -261,7 +267,6 @@ contract MainnetSwapSteward is
 
     /// @inheritdoc IMainnetSwapSteward
     function getExpectedOut(
-        address _priceChecker,
         uint256 amount,
         address fromToken,
         address toToken
@@ -327,14 +332,14 @@ contract MainnetSwapSteward is
             amount,
             IERC20(fromToken),
             IERC20(toToken),
-            COLLECTOR,
+            address(COLLECTOR),
             bytes32(0),
             _priceChecker,
             priceCheckerData
         );
 
         IERC20(fromToken).safeTransfer(
-            COLLECTOR,
+            address(COLLECTOR),
             IERC20(fromToken).balanceOf(address(this))
         );
 
@@ -349,7 +354,7 @@ contract MainnetSwapSteward is
         address fromOracle,
         address toOracle,
         uint256 slippage
-    ) internal view returns (bytes memory) {
+    ) internal pure returns (bytes memory) {
         return
             abi.encode(
                 slippage,
@@ -363,7 +368,7 @@ contract MainnetSwapSteward is
     function _getChainlinkCheckerData(
         address fromOracle,
         address toOracle
-    ) internal view returns (bytes memory) {
+    ) internal pure returns (bytes memory) {
         address[] memory paths = new address[](2);
         paths[0] = fromOracle;
         paths[1] = toOracle;
@@ -401,20 +406,53 @@ contract MainnetSwapSteward is
         emit MilkmanAddressUpdated(old, newMilkman);
     }
 
+    /// @dev Internal function to check maximum amount
+    function _checkAmount(
+        address fromToken,
+        uint256 amount
+    ) internal view returns (uint256) {
+        if (amount == type(uint256).max) {
+            amount = msg.sender == owner()
+                ? IERC20(fromToken).balanceOf(address(COLLECTOR))
+                : tokenBudget[fromToken];
+        }
+
+        return amount;
+    }
+
+    function _transferTokensIn(
+        address fromToken,
+        uint256 amount
+    ) internal returns (uint256) {
+        COLLECTOR.transfer(IERC20(fromToken), address(this), amount);
+        uint256 swapperBalance = IERC20(fromToken).balanceOf(address(this));
+
+        // some tokens, like stETH, can lose 1-2wei on transfer
+        if (swapperBalance < amount) {
+            amount = swapperBalance;
+        }
+
+        return amount;
+    }
+
     /// @dev Internal function to validate a swap's parameters
     function _validateSwap(
         address fromToken,
         address toToken,
         address fromOracle,
         address toOracle,
-        uint256 amountIn,
+        uint256 amount,
         uint256 slippage
-    ) internal view {
-        if (amountIn == 0) revert InvalidZeroAmount();
-        if (amountIn > tokenBudget[fromToken]) revert InsufficientBudget();
+    ) internal {
+        if (amount == 0) revert InvalidZeroAmount();
         if (slippage > MAX_SLIPPAGE) revert InvalidSlippage();
         if (!swapApprovedToken[fromToken][toToken]) {
             revert UnrecognizedTokenSwap();
+        }
+
+        if (msg.sender != owner()) {
+            if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
+            tokenBudget[fromToken] -= amount;
         }
 
         if (
@@ -422,6 +460,23 @@ contract MainnetSwapSteward is
             IAggregatorInterface(toOracle).latestAnswer() == 0
         ) {
             revert PriceFeedInvalidAnswer();
+        }
+    }
+
+    /// @dev Internal function to validate a limit swap's parameters
+    function _validateLimitSwap(
+        address fromToken,
+        address toToken,
+        uint256 amount
+    ) internal {
+        if (amount == 0) revert InvalidZeroAmount();
+        if (!swapApprovedToken[fromToken][toToken]) {
+            revert UnrecognizedTokenSwap();
+        }
+
+        if (msg.sender != owner()) {
+            if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
+            tokenBudget[fromToken] -= amount;
         }
     }
 }
