@@ -12,12 +12,13 @@ import { AaveV3Ethereum } from "@bgd-labs/aave-address-book";
 
 for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
   const blockGasLimit = getBlockGasLimit(gasLimit);
-  const base = 500_000;
+  const base = 800_000;
+  const perTxGas = 280_000;
   const maxLiquidationsPerTx = Math.floor(
-    (Number(blockGasLimit) - base) / 190_000,
+    (Number(blockGasLimit) - base) / perTxGas,
   );
   function getGasLimit(txns: number) {
-    return BigInt((base + txns * 190_000) * 1.2);
+    return BigInt((base + txns * perTxGas) * 1.2);
   }
   console.log(`######### Starting on ${chain.name} #########`);
   console.log(`maxGas: ${blockGasLimit}, maxTxn: ${maxLiquidationsPerTx}`);
@@ -74,7 +75,7 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
           );
           const value =
             (BigInt(debtPrice.latestAnswer) * BigInt(p.scaledVariableDebt)) /
-            1n ** BigInt(asset.decimals);
+            10n ** BigInt(asset.decimals);
           if (value < 2n) return false;
           return true;
         });
@@ -91,7 +92,7 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
           const value =
             (BigInt(collateralPrice.latestAnswer) *
               BigInt(p.scaledATokenBalance)) /
-            1n ** BigInt(asset.decimals);
+            10n ** BigInt(asset.decimals);
           if (value < 2n) return false;
           return true;
         });
@@ -143,40 +144,41 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
               gas: actualGas,
             });
             console.log("simulation succeeded");
-            try {
-              if ((chain as Chain).id === ChainId.mainnet) {
-                const hash = await walletClient.sendPrivateTransaction({
-                  to: pool.CLINIC_STEWARD,
-                  data: encodeFunctionData({
-                    abi: IClinicSteward_ABI,
-                    functionName: "batchLiquidate",
-                    args: params,
-                  }),
-                  type: txType,
-                  gas: actualGas,
-                });
-                await walletClient.waitForTransactionReceipt({
-                  confirmations: 5,
-                  hash,
-                });
-              } else {
-                console.log("trying to execute liquidation");
-                const hash = await walletClient.writeContract({
-                  ...request,
-                  account,
-                  gas: actualGas,
-                });
-                await walletClient.waitForTransactionReceipt({
-                  confirmations: 5,
-                  hash,
-                });
-                console.log("transaction confirmed");
-              }
-            } catch (e) {
-              console.log(e);
-            }
+            // try {
+            //   if ((chain as Chain).id === ChainId.mainnet) {
+            //     const hash = await walletClient.sendPrivateTransaction({
+            //       to: pool.CLINIC_STEWARD,
+            //       data: encodeFunctionData({
+            //         abi: IClinicSteward_ABI,
+            //         functionName: "batchLiquidate",
+            //         args: params,
+            //       }),
+            //       type: txType,
+            //       gas: actualGas,
+            //     });
+            //     await walletClient.waitForTransactionReceipt({
+            //       confirmations: 5,
+            //       hash,
+            //     });
+            //   } else {
+            //     console.log("trying to execute liquidation");
+            //     const hash = await walletClient.writeContract({
+            //       ...request,
+            //       account,
+            //       gas: actualGas,
+            //     });
+            //     await walletClient.waitForTransactionReceipt({
+            //       confirmations: 5,
+            //       hash,
+            //     });
+            //     console.log("transaction confirmed");
+            //   }
+            // } catch (e) {
+            //   console.log(e);
+            // }
           } catch (e) {
             console.log(`Error simulating ${params}`);
+            console.log(e);
           }
         }
         if (liquidateBatch.length) {
