@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 
+import {console2} from "forge-std/Test.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
@@ -169,7 +170,7 @@ contract MainnetSwapSteward is
     ) external onlyOwnerOrGuardian {
         amount = _checkAmount(fromToken, amount);
 
-        _validateLimitSwap(fromToken, toToken, amount);
+        _validateCommon(fromToken, toToken, amount);
 
         amount = _transferTokensIn(fromToken, amount);
 
@@ -196,9 +197,12 @@ contract MainnetSwapSteward is
         uint256 partDuration,
         uint256 span
     ) external onlyOwnerOrGuardian {
-        if (fromToken == address(0) || toToken == address(0))
-            revert InvalidZeroAddress();
-        if (sellAmount == 0 || numParts == 0) revert InvalidZeroAmount();
+        uint256 amount = sellAmount * numParts;
+        amount = _checkAmount(fromToken, amount);
+
+        _validateCommon(fromToken, toToken, sellAmount * numParts);
+
+        amount = _transferTokensIn(fromToken, amount);
 
         IMainnetSwapSteward.TWAPData memory twapData = TWAPData(
             IERC20(fromToken),
@@ -266,6 +270,42 @@ contract MainnetSwapSteward is
             amount,
             abi.encode(amountOut)
         );
+    }
+
+    /// @inheritdoc IMainnetSwapSteward
+    function cancelTwapSwap(
+        address fromToken,
+        address toToken,
+        uint256 sellAmount,
+        uint256 minPartLimit,
+        uint256 startTime,
+        uint256 numParts,
+        uint256 partDuration,
+        uint256 span
+    ) external onlyOwnerOrGuardian {
+        TWAPData memory twapData = TWAPData(
+            IERC20(fromToken),
+            IERC20(toToken),
+            address(COLLECTOR),
+            sellAmount,
+            minPartLimit,
+            startTime,
+            numParts,
+            partDuration,
+            span,
+            bytes32(0)
+        );
+        IConditionalOrder.ConditionalOrderParams
+            memory params = IConditionalOrder.ConditionalOrderParams(
+                IConditionalOrder(handler),
+                "AaveSwapper-TWAP-Swap",
+                abi.encode(twapData)
+            );
+        bytes32 hashedOrder = composableCow.hash(params);
+        console2.logBytes32(hashedOrder);
+        composableCow.remove(hashedOrder);
+
+        emit TWAPSwapCanceled(fromToken, toToken, sellAmount * numParts);
     }
 
     /// @inheritdoc IMainnetSwapSteward
@@ -497,7 +537,7 @@ contract MainnetSwapSteward is
     function _setRelayer(address newRelayer) internal {
         if (newRelayer == address(0)) revert InvalidZeroAddress();
         address old = newRelayer;
-        handler = newRelayer;
+        relayer = newRelayer;
 
         emit RelayerAddressUpdated(old, newRelayer);
     }
@@ -540,16 +580,9 @@ contract MainnetSwapSteward is
         uint256 amount,
         uint256 slippage
     ) internal {
-        if (amount == 0) revert InvalidZeroAmount();
         if (slippage > MAX_SLIPPAGE) revert InvalidSlippage();
-        if (!swapApprovedToken[fromToken][toToken]) {
-            revert UnrecognizedTokenSwap();
-        }
 
-        if (msg.sender != owner()) {
-            if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
-            tokenBudget[fromToken] -= amount;
-        }
+        _validateCommon(fromToken, toToken, amount);
 
         if (
             IAggregatorInterface(fromOracle).latestAnswer() == 0 ||
@@ -559,8 +592,8 @@ contract MainnetSwapSteward is
         }
     }
 
-    /// @dev Internal function to validate a limit swap's parameters
-    function _validateLimitSwap(
+    /// @dev internal function to perform common validation of swaps
+    function _validateCommon(
         address fromToken,
         address toToken,
         uint256 amount

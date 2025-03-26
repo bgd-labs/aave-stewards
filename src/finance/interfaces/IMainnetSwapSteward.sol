@@ -247,6 +247,26 @@ interface IMainnetSwapSteward {
         uint256 amountOut
     ) external;
 
+    /// @notice Function to cancel a pending time-weighted-average-price swap
+    /// @param fromToken Address of the token to swap
+    /// @param toToken Address of the token to receive
+    /// @param sellAmount The amount of tokens to sell per TWAP swap
+    /// @param minPartLimit Minimum amount of toToken to receive per TWAP swap
+    /// @param startTime Timestamp of when TWAP orders start
+    /// @param numParts Number of TWAP swaps to take place (each for sellAmount)
+    /// @param partDuration How long each TWAP takes (ie: hourly, weekly, etc)
+    /// @param span The timeframe the orders can take place in
+    function cancelTwapSwap(
+        address fromToken,
+        address toToken,
+        uint256 sellAmount,
+        uint256 minPartLimit,
+        uint256 startTime,
+        uint256 numParts,
+        uint256 partDuration,
+        uint256 span
+    ) external;
+
     /// @notice Rescues the specified token back to the Collector
     /// @param token The address of the ERC20 token to rescue
     function rescueToken(address token) external;
