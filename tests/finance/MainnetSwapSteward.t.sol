@@ -23,6 +23,8 @@ import {MainnetSwapSteward, IMainnetSwapSteward} from "src/finance/MainnetSwapSt
 contract MainnetSwapStewardTest is Test {
     event ApprovedToken(address indexed fromToken, address indexed toToken);
     event MilkmanAddressUpdated(address oldAddress, address newAddress);
+    event HandlerAddressUpdated(address oldAddress, address newAddress);
+    event RelayerAddressUpdated(address oldAddress, address newAddress);
     event PriceCheckerUpdated(address oldAddress, address newAddress);
     event LimitOrderPriceCheckerUpdated(address oldAddress, address newAddress);
     event LimitSwapRequested(
@@ -864,7 +866,38 @@ contract SetPriceChecker is MainnetSwapStewardTest {
     }
 }
 
-contract SetMilkman is MainnetSwapStewardTest {
+contract SetLimitOrderPriceChecker is MainnetSwapStewardTest {
+    function test_revertsIf_invalidCaller() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                address(this)
+            )
+        );
+        steward.setLimitOrderPriceChecker(makeAddr("price-checker"));
+    }
+
+    function test_revertsIf_invalidZeroAddress() public {
+        vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+        vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+        steward.setLimitOrderPriceChecker(address(0));
+    }
+
+    function test_successful() public {
+        address newChecker = makeAddr("new-checker");
+        vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+        vm.expectEmit(true, true, true, true, address(steward));
+        emit LimitOrderPriceCheckerUpdated(
+            steward.limitOrderPriceChecker(),
+            newChecker
+        );
+        steward.setLimitOrderPriceChecker(newChecker);
+
+        assertEq(steward.limitOrderPriceChecker(), newChecker);
+    }
+}
+
+contract SetMilkmanTest is MainnetSwapStewardTest {
     function test_revertsIf_invalidCaller() public {
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -889,6 +922,170 @@ contract SetMilkman is MainnetSwapStewardTest {
         steward.setMilkman(newMilkman);
 
         assertEq(steward.milkman(), newMilkman);
+    }
+}
+
+contract SetHandlerTest is MainnetSwapStewardTest {
+    function test_revertsIf_invalidCaller() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                address(this)
+            )
+        );
+        steward.setHandler(makeAddr("new-handler"));
+    }
+
+    function test_revertsIf_invalidZeroAddress() public {
+        vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+        vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+        steward.setHandler(address(0));
+    }
+
+    function test_successful() public {
+        address newHandler = makeAddr("new-handler");
+        vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+        vm.expectEmit(true, true, true, true, address(steward));
+        emit HandlerAddressUpdated(steward.handler(), newHandler);
+        steward.setHandler(newHandler);
+
+        assertEq(steward.handler(), newHandler);
+    }
+}
+
+contract SetRelayerTest is MainnetSwapStewardTest {
+    function test_revertsIf_invalidCaller() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                address(this)
+            )
+        );
+        steward.setRelayer(makeAddr("new-relayer"));
+    }
+
+    function test_revertsIf_invalidZeroAddress() public {
+        vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+        vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+        steward.setRelayer(address(0));
+    }
+
+    function test_successful() public {
+        address newRelayer = makeAddr("new-relayer");
+        vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+        vm.expectEmit(true, true, true, true, address(steward));
+        emit RelayerAddressUpdated(steward.relayer(), newRelayer);
+        steward.setRelayer(newRelayer);
+
+        assertEq(steward.relayer(), newRelayer);
+    }
+}
+
+contract RescueTokenTest is MainnetSwapStewardTest {
+    function test_successful_permissionless() public {
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(steward)
+            ),
+            0
+        );
+
+        uint256 aaveAmount = 1_000e18;
+
+        deal(
+            AaveV2EthereumAssets.AAVE_UNDERLYING,
+            address(steward),
+            aaveAmount
+        );
+
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(steward)
+            ),
+            aaveAmount
+        );
+
+        uint256 initialCollectorAaveBalance = IERC20(
+            AaveV2EthereumAssets.AAVE_UNDERLYING
+        ).balanceOf(address(AaveV2Ethereum.COLLECTOR));
+
+        steward.rescueToken(AaveV2EthereumAssets.AAVE_UNDERLYING);
+
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(AaveV2Ethereum.COLLECTOR)
+            ),
+            initialCollectorAaveBalance + aaveAmount
+        );
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(steward)
+            ),
+            0
+        );
+    }
+
+    function test_successful_governanceCaller() public {
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(steward)
+            ),
+            0
+        );
+
+        uint256 aaveAmount = 1_000e18;
+
+        deal(
+            AaveV2EthereumAssets.AAVE_UNDERLYING,
+            address(steward),
+            aaveAmount
+        );
+
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(steward)
+            ),
+            aaveAmount
+        );
+
+        uint256 initialCollectorAaveBalance = IERC20(
+            AaveV2EthereumAssets.AAVE_UNDERLYING
+        ).balanceOf(address(AaveV2Ethereum.COLLECTOR));
+
+        vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+        steward.rescueToken(AaveV2EthereumAssets.AAVE_UNDERLYING);
+        vm.stopPrank();
+
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(AaveV2Ethereum.COLLECTOR)
+            ),
+            initialCollectorAaveBalance + aaveAmount
+        );
+        assertEq(
+            IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(
+                address(steward)
+            ),
+            0
+        );
+    }
+}
+
+contract MaxRescueTest is MainnetSwapStewardTest {
+    function test_maxRescue() public {
+        assertEq(steward.maxRescue(AaveV3EthereumAssets.USDC_UNDERLYING), 0);
+
+        uint256 mintAmount = 1_000_000e18;
+        deal(
+            AaveV3EthereumAssets.USDC_UNDERLYING,
+            address(steward),
+            mintAmount
+        );
+
+        assertEq(
+            steward.maxRescue(AaveV3EthereumAssets.USDC_UNDERLYING),
+            mintAmount
+        );
     }
 }
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.8.0 <0.9.0;
+
+pragma solidity ^0.8.0;
 
 import {IComposableCow} from "src/finance/interfaces/IComposableCow.sol";
 import {GPv2Order} from "src/finance/libraries/GPv2Order.sol";

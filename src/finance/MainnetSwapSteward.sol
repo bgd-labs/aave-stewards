@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-import {console2} from "forge-std/Test.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
@@ -302,7 +301,6 @@ contract MainnetSwapSteward is
                 abi.encode(twapData)
             );
         bytes32 hashedOrder = composableCow.hash(params);
-        console2.logBytes32(hashedOrder);
         composableCow.remove(hashedOrder);
 
         emit TWAPSwapCanceled(fromToken, toToken, sellAmount * numParts);
@@ -365,7 +363,7 @@ contract MainnetSwapSteward is
     function setLimitOrderPriceChecker(
         address newPriceChecker
     ) external onlyOwner {
-        _setPriceChecker(newPriceChecker);
+        _setLimitOrderPriceChecker(newPriceChecker);
     }
 
     /// @inheritdoc IMainnetSwapSteward
@@ -509,7 +507,7 @@ contract MainnetSwapSteward is
     /// @dev Internal function to set the price checker
     function _setLimitOrderPriceChecker(address newPriceChecker) internal {
         if (newPriceChecker == address(0)) revert InvalidZeroAddress();
-        address old = priceChecker;
+        address old = limitOrderPriceChecker;
         limitOrderPriceChecker = newPriceChecker;
 
         emit LimitOrderPriceCheckerUpdated(old, newPriceChecker);
@@ -527,7 +525,7 @@ contract MainnetSwapSteward is
     /// @dev Internal function to set the Handler instance address
     function _setHandler(address newHandler) internal {
         if (newHandler == address(0)) revert InvalidZeroAddress();
-        address old = newHandler;
+        address old = handler;
         handler = newHandler;
 
         emit HandlerAddressUpdated(old, newHandler);
@@ -536,7 +534,7 @@ contract MainnetSwapSteward is
     /// @dev Internal function to set the Relayer instance address
     function _setRelayer(address newRelayer) internal {
         if (newRelayer == address(0)) revert InvalidZeroAddress();
-        address old = newRelayer;
+        address old = relayer;
         relayer = newRelayer;
 
         emit RelayerAddressUpdated(old, newRelayer);
