@@ -144,38 +144,38 @@ for (const { chain, pool, txType, gasLimit } of CHAIN_POOL_MAP) {
               gas: actualGas,
             });
             console.log("simulation succeeded");
-            // try {
-            //   if ((chain as Chain).id === ChainId.mainnet) {
-            //     const hash = await walletClient.sendPrivateTransaction({
-            //       to: pool.CLINIC_STEWARD,
-            //       data: encodeFunctionData({
-            //         abi: IClinicSteward_ABI,
-            //         functionName: "batchLiquidate",
-            //         args: params,
-            //       }),
-            //       type: txType,
-            //       gas: actualGas,
-            //     });
-            //     await walletClient.waitForTransactionReceipt({
-            //       confirmations: 5,
-            //       hash,
-            //     });
-            //   } else {
-            //     console.log("trying to execute liquidation");
-            //     const hash = await walletClient.writeContract({
-            //       ...request,
-            //       account,
-            //       gas: actualGas,
-            //     });
-            //     await walletClient.waitForTransactionReceipt({
-            //       confirmations: 5,
-            //       hash,
-            //     });
-            //     console.log("transaction confirmed");
-            //   }
-            // } catch (e) {
-            //   console.log(e);
-            // }
+            try {
+              if ((chain as Chain).id === ChainId.mainnet) {
+                const hash = await walletClient.sendPrivateTransaction({
+                  to: pool.CLINIC_STEWARD,
+                  data: encodeFunctionData({
+                    abi: IClinicSteward_ABI,
+                    functionName: "batchLiquidate",
+                    args: params,
+                  }),
+                  type: txType,
+                  gas: actualGas,
+                });
+                await walletClient.waitForTransactionReceipt({
+                  confirmations: 5,
+                  hash,
+                });
+              } else {
+                console.log("trying to execute liquidation");
+                const hash = await walletClient.writeContract({
+                  ...request,
+                  account,
+                  gas: actualGas,
+                });
+                await walletClient.waitForTransactionReceipt({
+                  confirmations: 5,
+                  hash,
+                });
+                console.log("transaction confirmed");
+              }
+            } catch (e) {
+              console.log(e);
+            }
           } catch (e) {
             console.log(`Error simulating ${params}`);
             console.log(e);
