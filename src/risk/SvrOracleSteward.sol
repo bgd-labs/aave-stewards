@@ -35,7 +35,7 @@ contract SvrOracleSteward is OwnableWithGuardian, ISvrOracleSteward {
 
   int256 internal constant BPS_MAX = 100_00;
   // allow deviation of <0.1%
-  int256 internal constant MAX_DEVIATION_BPS = 10;
+  int256 internal constant MAX_DEVIATION_BPS = 1_00;
 
   // stores the configured svr oracles
   mapping(address asset => address svrOracle) internal _svrOracles;
