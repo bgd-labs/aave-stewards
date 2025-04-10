@@ -7,7 +7,6 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
-import {MiscEthereum} from "aave-address-book/MiscEthereum.sol";
 import {ERC1271Forwarder} from "src/finance/ERC1271Forwarder.sol";
 import {IAggregatorInterface} from "src/finance/interfaces/IAggregatorInterface.sol";
 import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
@@ -52,558 +51,428 @@ import {IMainnetSwapSteward} from "src/finance/interfaces/IMainnetSwapSteward.so
  * Majors: Swap wBTC to wETH as part of the treasury strategy
  *
  */
-contract MainnetSwapSteward is
-    IMainnetSwapSteward,
-    OwnableWithGuardian,
-    Multicall,
-    RescuableBase,
-    ERC1271Forwarder
-{
-    using SafeERC20 for IERC20;
+contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multicall, RescuableBase, ERC1271Forwarder {
+  using SafeERC20 for IERC20;
 
-    /// @inheritdoc IMainnetSwapSteward
-    uint256 public constant MAX_SLIPPAGE = 1000; // 10%
+  /// @inheritdoc IMainnetSwapSteward
+  uint256 public constant MAX_SLIPPAGE = 10_00; // 10%
 
-    /// @inheritdoc IMainnetSwapSteward
-    ICollector public immutable COLLECTOR;
+  /// @inheritdoc IMainnetSwapSteward
+  address public immutable COLLECTOR;
 
-    /// @inheritdoc IMainnetSwapSteward
-    address public milkman;
+  /// @inheritdoc IMainnetSwapSteward
+  address public milkman;
 
-    /// @inheritdoc IMainnetSwapSteward
-    address public handler;
+  /// @inheritdoc IMainnetSwapSteward
+  address public handler;
 
-    /// @inheritdoc IMainnetSwapSteward
-    address public relayer;
+  /// @inheritdoc IMainnetSwapSteward
+  address public relayer;
 
-    /// @inheritdoc IMainnetSwapSteward
-    address public priceChecker;
+  /// @inheritdoc IMainnetSwapSteward
+  address public priceChecker;
 
-    /// @inheritdoc IMainnetSwapSteward
-    address public limitOrderPriceChecker;
+  /// @inheritdoc IMainnetSwapSteward
+  address public limitOrderPriceChecker;
 
-    /// @inheritdoc IMainnetSwapSteward
-    mapping(address fromToken => mapping(address toToken => bool isApproved))
-        public swapApprovedToken;
+  /// @inheritdoc IMainnetSwapSteward
+  mapping(address fromToken => mapping(address toToken => bool isApproved)) public swapApprovedToken;
 
-    /// @inheritdoc IMainnetSwapSteward
-    mapping(address token => address oracle) public priceOracle;
+  /// @inheritdoc IMainnetSwapSteward
+  mapping(address token => address oracle) public priceOracle;
 
-    /// @inheritdoc IMainnetSwapSteward
-    mapping(address token => uint256 budget) public tokenBudget;
+  /// @inheritdoc IMainnetSwapSteward
+  mapping(address token => uint256 budget) public tokenBudget;
 
-    constructor(
-        address initialOwner,
-        address initialGuardian,
-        address collector,
-        address initialMilkman,
-        address initialPriceChecker,
-        address initialLimitOrderPriceChecker,
-        address initialComposableCow,
-        address initialHandler,
-        address initialRelayer
-    )
-        OwnableWithGuardian(initialOwner, initialGuardian)
-        ERC1271Forwarder(initialComposableCow)
-    {
-        if (collector == address(0)) revert InvalidZeroAddress();
-        if (initialHandler == address(0)) revert InvalidZeroAddress();
-        if (initialRelayer == address(0)) revert InvalidZeroAddress();
+  constructor(
+    address initialOwner,
+    address initialGuardian,
+    address collector,
+    address initialMilkman,
+    address initialPriceChecker,
+    address initialLimitOrderPriceChecker,
+    address initialComposableCow,
+    address initialHandler,
+    address initialRelayer
+  ) OwnableWithGuardian(initialOwner, initialGuardian) ERC1271Forwarder(initialComposableCow) {
+    if (collector == address(0)) revert InvalidZeroAddress();
+    if (initialHandler == address(0)) revert InvalidZeroAddress();
+    if (initialRelayer == address(0)) revert InvalidZeroAddress();
 
-        _setMilkman(initialMilkman);
-        _setPriceChecker(initialPriceChecker);
-        _setLimitOrderPriceChecker(initialLimitOrderPriceChecker);
-        _setHandler(initialHandler);
-        _setRelayer(initialRelayer);
+    _setMilkman(initialMilkman);
+    _setPriceChecker(initialPriceChecker);
+    _setLimitOrderPriceChecker(initialLimitOrderPriceChecker);
+    _setHandler(initialHandler);
+    _setRelayer(initialRelayer);
 
-        COLLECTOR = ICollector(collector);
+    COLLECTOR = collector;
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function swap(address fromToken, address toToken, uint256 amount, uint256 slippage) external onlyOwnerOrGuardian {
+    address fromOracle = priceOracle[fromToken];
+    address toOracle = priceOracle[toToken];
+    amount = _checkAmount(fromToken, amount);
+
+    _validateSwap(fromToken, toToken, fromOracle, toOracle, amount, slippage);
+
+    amount = _transferTokensIn(fromToken, amount);
+
+    _swap(priceChecker, fromToken, toToken, COLLECTOR, amount, _getPriceCheckerAndData(fromOracle, toOracle, slippage));
+
+    emit SwapRequested(fromToken, toToken, fromOracle, toOracle, amount, slippage);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function limitSwap(address fromToken, address toToken, uint256 amount, uint256 amountOut)
+    external
+    onlyOwnerOrGuardian
+  {
+    amount = _checkAmount(fromToken, amount);
+
+    _validateCommon(fromToken, toToken, amount);
+
+    amount = _transferTokensIn(fromToken, amount);
+
+    _swap(limitOrderPriceChecker, fromToken, toToken, COLLECTOR, amount, abi.encode(amountOut));
+
+    emit LimitSwapRequested(fromToken, toToken, amount, amountOut);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function twapSwap(
+    address fromToken,
+    address toToken,
+    uint256 sellAmount,
+    uint256 minPartLimit,
+    uint256 startTime,
+    uint256 numParts,
+    uint256 partDuration,
+    uint256 span
+  ) external onlyOwnerOrGuardian {
+    uint256 amount = sellAmount * numParts;
+    amount = _checkAmount(fromToken, amount);
+
+    _validateCommon(fromToken, toToken, sellAmount * numParts);
+
+    amount = _transferTokensIn(fromToken, amount);
+
+    IMainnetSwapSteward.TWAPData memory twapData = TWAPData(
+      IERC20(fromToken),
+      IERC20(toToken),
+      COLLECTOR,
+      sellAmount,
+      minPartLimit,
+      startTime,
+      numParts,
+      partDuration,
+      span,
+      bytes32(0)
+    );
+
+    IConditionalOrder.ConditionalOrderParams memory params = IConditionalOrder.ConditionalOrderParams(
+      IConditionalOrder(handler), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
+    );
+    COMPOSABLE_COW.create(params, true);
+
+    IERC20(fromToken).forceApprove(relayer, sellAmount * numParts);
+
+    emit TWAPSwapRequested(fromToken, toToken, sellAmount * numParts);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function cancelSwap(address tradeMilkman, address fromToken, address toToken, uint256 amount, uint256 slippage)
+    external
+    onlyOwnerOrGuardian
+  {
+    bytes memory data = _getPriceCheckerAndData(priceOracle[fromToken], priceOracle[toToken], slippage);
+
+    _cancelSwap(tradeMilkman, priceChecker, fromToken, toToken, amount, data);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function cancelLimitSwap(address tradeMilkman, address fromToken, address toToken, uint256 amount, uint256 amountOut)
+    external
+    onlyOwnerOrGuardian
+  {
+    _cancelSwap(tradeMilkman, limitOrderPriceChecker, fromToken, toToken, amount, abi.encode(amountOut));
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function cancelTwapSwap(
+    address fromToken,
+    address toToken,
+    uint256 sellAmount,
+    uint256 minPartLimit,
+    uint256 startTime,
+    uint256 numParts,
+    uint256 partDuration,
+    uint256 span
+  ) external onlyOwnerOrGuardian {
+    TWAPData memory twapData = TWAPData(
+      IERC20(fromToken),
+      IERC20(toToken),
+      COLLECTOR,
+      sellAmount,
+      minPartLimit,
+      startTime,
+      numParts,
+      partDuration,
+      span,
+      bytes32(0)
+    );
+    IConditionalOrder.ConditionalOrderParams memory params = IConditionalOrder.ConditionalOrderParams(
+      IConditionalOrder(handler), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
+    );
+    bytes32 hashedOrder = COMPOSABLE_COW.hash(params);
+    COMPOSABLE_COW.remove(hashedOrder);
+
+    emit TWAPSwapCanceled(fromToken, toToken, sellAmount * numParts);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function setTokenBudget(address token, uint256 budget) external onlyOwner {
+    tokenBudget[token] = budget;
+
+    emit UpdatedTokenBudget(token, budget);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function rescueToken(address token) external {
+    _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
+  }
+
+  /// @inheritdoc IRescuableBase
+  function maxRescue(address token) public view override(RescuableBase) returns (uint256) {
+    return IERC20(token).balanceOf(address(this));
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function setSwappablePair(address fromToken, address toToken) external onlyOwner {
+    if (fromToken == toToken) revert UnrecognizedTokenSwap();
+
+    swapApprovedToken[fromToken][toToken] = true;
+
+    emit ApprovedToken(fromToken, toToken);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function setTokenOracle(address token, address oracle) external onlyOwner {
+    if (oracle == address(0)) revert InvalidZeroAddress();
+
+    // Validate oracle has necessary functions
+    if (IAggregatorInterface(oracle).decimals() != 8) {
+      revert PriceFeedIncompatibleDecimals();
+    }
+    if (IAggregatorInterface(oracle).latestAnswer() == 0) {
+      revert PriceFeedInvalidAnswer();
     }
 
-    /// @inheritdoc IMainnetSwapSteward
-    function swap(
-        address fromToken,
-        address toToken,
-        uint256 amount,
-        uint256 slippage
-    ) external onlyOwnerOrGuardian {
-        address fromOracle = priceOracle[fromToken];
-        address toOracle = priceOracle[toToken];
-        amount = _checkAmount(fromToken, amount);
+    priceOracle[token] = oracle;
 
-        _validateSwap(
-            fromToken,
-            toToken,
-            fromOracle,
-            toOracle,
-            amount,
-            slippage
-        );
+    emit SetTokenOracle(token, oracle);
+  }
 
-        amount = _transferTokensIn(fromToken, amount);
+  /// @inheritdoc IMainnetSwapSteward
+  function setPriceChecker(address newPriceChecker) external onlyOwner {
+    _setPriceChecker(newPriceChecker);
+  }
 
-        _swap(
-            priceChecker,
-            fromToken,
-            toToken,
-            address(COLLECTOR),
-            amount,
-            _getPriceCheckerAndData(fromOracle, toOracle, slippage)
-        );
+  /// @inheritdoc IMainnetSwapSteward
+  function setLimitOrderPriceChecker(address newPriceChecker) external onlyOwner {
+    _setLimitOrderPriceChecker(newPriceChecker);
+  }
 
-        emit SwapRequested(
-            fromToken,
-            toToken,
-            fromOracle,
-            toOracle,
-            amount,
-            slippage
-        );
+  /// @inheritdoc IMainnetSwapSteward
+  function setHandler(address newHandler) external onlyOwner {
+    _setHandler(newHandler);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function setRelayer(address newRelayer) external onlyOwner {
+    _setRelayer(newRelayer);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function setMilkman(address newMilkman) external onlyOwner {
+    _setMilkman(newMilkman);
+  }
+
+  /// @inheritdoc IMainnetSwapSteward
+  function getExpectedOut(uint256 amount, address fromToken, address toToken) public view returns (uint256) {
+    bytes memory data = _getPriceCheckerAndData(priceOracle[fromToken], priceOracle[toToken], 0);
+
+    (, bytes memory _data) = abi.decode(data, (uint256, bytes));
+
+    return IPriceChecker(priceChecker).EXPECTED_OUT_CALCULATOR().getExpectedOut(amount, fromToken, toToken, _data);
+  }
+
+  /// @notice Internal function that handles swaps
+  /// @param _priceChecker Address of the price checker to validate order
+  /// @param fromToken Address of the token to swap from
+  /// @param toToken Address of the token to swap to
+  /// @param recipient Address of the account receiving the swapped funds
+  /// @param amount The amount of fromToken to swap
+  /// @param priceCheckerData abi-encoded data for price checker
+  function _swap(
+    address _priceChecker,
+    address fromToken,
+    address toToken,
+    address recipient,
+    uint256 amount,
+    bytes memory priceCheckerData
+  ) internal {
+    IERC20(fromToken).forceApprove(milkman, amount);
+
+    IMilkman(milkman).requestSwapExactTokensForTokens(
+      amount, IERC20(fromToken), IERC20(toToken), recipient, bytes32(0), _priceChecker, priceCheckerData
+    );
+  }
+
+  /// @notice Internal function that handles swap cancellations
+  /// @param tradeMilkman Address of the Milkman contract to submit the order
+  /// @param _priceChecker Address of the price checker to validate order
+  /// @param fromToken Address of the token to swap from
+  /// @param toToken Address of the token to swap to
+  /// @param amount The amount of fromToken to swap
+  /// @param priceCheckerData abi-encoded data for price checker
+  function _cancelSwap(
+    address tradeMilkman,
+    address _priceChecker,
+    address fromToken,
+    address toToken,
+    uint256 amount,
+    bytes memory priceCheckerData
+  ) internal {
+    IMilkman(tradeMilkman).cancelSwap(
+      amount, IERC20(fromToken), IERC20(toToken), COLLECTOR, bytes32(0), _priceChecker, priceCheckerData
+    );
+
+    IERC20(fromToken).safeTransfer(COLLECTOR, IERC20(fromToken).balanceOf(address(this)));
+
+    emit SwapCanceled(fromToken, toToken, amount);
+  }
+
+  /// @notice Helper function to abi-encode data for price checker
+  /// @param fromOracle Address of the oracle to check fromToken price
+  /// @param toOracle Address of the oracle to check toToken price
+  /// @param slippage The allowed slippage compared to the oracle price (in BPS)
+  function _getPriceCheckerAndData(address fromOracle, address toOracle, uint256 slippage)
+    internal
+    pure
+    returns (bytes memory)
+  {
+    return abi.encode(slippage, _getChainlinkCheckerData(fromOracle, toOracle));
+  }
+
+  /// @notice Helper function to abi-encode Chainlink oracle data
+  /// @param fromOracle Address of the oracle to check fromToken price
+  /// @param toOracle Address of the oracle to check toToken price
+  function _getChainlinkCheckerData(address fromOracle, address toOracle) internal pure returns (bytes memory) {
+    address[] memory paths = new address[](2);
+    paths[0] = fromOracle;
+    paths[1] = toOracle;
+
+    bool[] memory reverses = new bool[](2);
+    reverses[1] = true;
+
+    return abi.encode(paths, reverses);
+  }
+
+  /// @dev Internal function to set the price checker
+  function _setPriceChecker(address newPriceChecker) internal {
+    if (newPriceChecker == address(0)) revert InvalidZeroAddress();
+    address old = priceChecker;
+    priceChecker = newPriceChecker;
+
+    emit PriceCheckerUpdated(old, newPriceChecker);
+  }
+
+  /// @dev Internal function to set the price checker
+  function _setLimitOrderPriceChecker(address newPriceChecker) internal {
+    if (newPriceChecker == address(0)) revert InvalidZeroAddress();
+    address old = limitOrderPriceChecker;
+    limitOrderPriceChecker = newPriceChecker;
+
+    emit LimitOrderPriceCheckerUpdated(old, newPriceChecker);
+  }
+
+  /// @dev Internal function to set the Milkman instance address
+  function _setMilkman(address newMilkman) internal {
+    if (newMilkman == address(0)) revert InvalidZeroAddress();
+    address old = milkman;
+    milkman = newMilkman;
+
+    emit MilkmanAddressUpdated(old, newMilkman);
+  }
+
+  /// @dev Internal function to set the Handler instance address
+  function _setHandler(address newHandler) internal {
+    if (newHandler == address(0)) revert InvalidZeroAddress();
+    address old = handler;
+    handler = newHandler;
+
+    emit HandlerAddressUpdated(old, newHandler);
+  }
+
+  /// @dev Internal function to set the Relayer instance address
+  function _setRelayer(address newRelayer) internal {
+    if (newRelayer == address(0)) revert InvalidZeroAddress();
+    address old = relayer;
+    relayer = newRelayer;
+
+    emit RelayerAddressUpdated(old, newRelayer);
+  }
+
+  /// @dev Internal function to check maximum amount
+  function _checkAmount(address fromToken, uint256 amount) internal view returns (uint256) {
+    if (amount == type(uint256).max) {
+      amount = msg.sender == owner() ? IERC20(fromToken).balanceOf(COLLECTOR) : tokenBudget[fromToken];
     }
 
-    /// @inheritdoc IMainnetSwapSteward
-    function limitSwap(
-        address fromToken,
-        address toToken,
-        uint256 amount,
-        uint256 amountOut
-    ) external onlyOwnerOrGuardian {
-        amount = _checkAmount(fromToken, amount);
+    return amount;
+  }
 
-        _validateCommon(fromToken, toToken, amount);
+  function _transferTokensIn(address fromToken, uint256 amount) internal returns (uint256) {
+    ICollector(COLLECTOR).transfer(IERC20(fromToken), address(this), amount);
+    uint256 swapperBalance = IERC20(fromToken).balanceOf(address(this));
 
-        amount = _transferTokensIn(fromToken, amount);
-
-        _swap(
-            limitOrderPriceChecker,
-            fromToken,
-            toToken,
-            address(COLLECTOR),
-            amount,
-            abi.encode(amountOut)
-        );
-
-        emit LimitSwapRequested(fromToken, toToken, amount, amountOut);
+    // some tokens, like stETH, can lose 1-2wei on transfer
+    if (swapperBalance < amount) {
+      amount = swapperBalance;
     }
 
-    /// @inheritdoc IMainnetSwapSteward
-    function twapSwap(
-        address fromToken,
-        address toToken,
-        uint256 sellAmount,
-        uint256 minPartLimit,
-        uint256 startTime,
-        uint256 numParts,
-        uint256 partDuration,
-        uint256 span
-    ) external onlyOwnerOrGuardian {
-        uint256 amount = sellAmount * numParts;
-        amount = _checkAmount(fromToken, amount);
+    return amount;
+  }
 
-        _validateCommon(fromToken, toToken, sellAmount * numParts);
+  /// @dev Internal function to validate a swap's parameters
+  function _validateSwap(
+    address fromToken,
+    address toToken,
+    address fromOracle,
+    address toOracle,
+    uint256 amount,
+    uint256 slippage
+  ) internal {
+    if (slippage > MAX_SLIPPAGE) revert InvalidSlippage();
 
-        amount = _transferTokensIn(fromToken, amount);
+    _validateCommon(fromToken, toToken, amount);
 
-        IMainnetSwapSteward.TWAPData memory twapData = TWAPData(
-            IERC20(fromToken),
-            IERC20(toToken),
-            address(COLLECTOR),
-            sellAmount,
-            minPartLimit,
-            startTime,
-            numParts,
-            partDuration,
-            span,
-            bytes32(0)
-        );
+    if (IAggregatorInterface(fromOracle).latestAnswer() == 0 || IAggregatorInterface(toOracle).latestAnswer() == 0) {
+      revert PriceFeedInvalidAnswer();
+    }
+  }
 
-        IConditionalOrder.ConditionalOrderParams
-            memory params = IConditionalOrder.ConditionalOrderParams(
-                IConditionalOrder(handler),
-                "AaveSwapper-TWAP-Swap",
-                abi.encode(twapData)
-            );
-        composableCow.create(params, true);
-
-        IERC20(fromToken).forceApprove(relayer, sellAmount * numParts);
-
-        emit TWAPSwapRequested(fromToken, toToken, sellAmount * numParts);
+  /// @dev internal function to perform common validation of swaps
+  function _validateCommon(address fromToken, address toToken, uint256 amount) internal {
+    if (amount == 0) revert InvalidZeroAmount();
+    if (!swapApprovedToken[fromToken][toToken]) {
+      revert UnrecognizedTokenSwap();
     }
 
-    /// @inheritdoc IMainnetSwapSteward
-    function cancelSwap(
-        address tradeMilkman,
-        address fromToken,
-        address toToken,
-        uint256 amount,
-        uint256 slippage
-    ) external onlyOwnerOrGuardian {
-        bytes memory data = _getPriceCheckerAndData(
-            priceOracle[fromToken],
-            priceOracle[toToken],
-            slippage
-        );
-
-        _cancelSwap(
-            tradeMilkman,
-            priceChecker,
-            fromToken,
-            toToken,
-            amount,
-            data
-        );
+    if (msg.sender != owner()) {
+      if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
+      tokenBudget[fromToken] -= amount;
     }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function cancelLimitSwap(
-        address tradeMilkman,
-        address fromToken,
-        address toToken,
-        uint256 amount,
-        uint256 amountOut
-    ) external onlyOwnerOrGuardian {
-        _cancelSwap(
-            tradeMilkman,
-            limitOrderPriceChecker,
-            fromToken,
-            toToken,
-            amount,
-            abi.encode(amountOut)
-        );
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function cancelTwapSwap(
-        address fromToken,
-        address toToken,
-        uint256 sellAmount,
-        uint256 minPartLimit,
-        uint256 startTime,
-        uint256 numParts,
-        uint256 partDuration,
-        uint256 span
-    ) external onlyOwnerOrGuardian {
-        TWAPData memory twapData = TWAPData(
-            IERC20(fromToken),
-            IERC20(toToken),
-            address(COLLECTOR),
-            sellAmount,
-            minPartLimit,
-            startTime,
-            numParts,
-            partDuration,
-            span,
-            bytes32(0)
-        );
-        IConditionalOrder.ConditionalOrderParams
-            memory params = IConditionalOrder.ConditionalOrderParams(
-                IConditionalOrder(handler),
-                "AaveSwapper-TWAP-Swap",
-                abi.encode(twapData)
-            );
-        bytes32 hashedOrder = composableCow.hash(params);
-        composableCow.remove(hashedOrder);
-
-        emit TWAPSwapCanceled(fromToken, toToken, sellAmount * numParts);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setTokenBudget(address token, uint256 budget) external onlyOwner {
-        tokenBudget[token] = budget;
-
-        emit UpdatedTokenBudget(token, budget);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function rescueToken(address token) external {
-        _emergencyTokenTransfer(token, address(COLLECTOR), type(uint256).max);
-    }
-
-    /// @inheritdoc IRescuableBase
-    function maxRescue(
-        address token
-    ) public view override(RescuableBase) returns (uint256) {
-        return IERC20(token).balanceOf(address(this));
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setSwappablePair(
-        address fromToken,
-        address toToken
-    ) external onlyOwner {
-        if (fromToken == toToken) revert UnrecognizedTokenSwap();
-
-        swapApprovedToken[fromToken][toToken] = true;
-
-        emit ApprovedToken(fromToken, toToken);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setTokenOracle(address token, address oracle) external onlyOwner {
-        if (oracle == address(0)) revert InvalidZeroAddress();
-
-        // Validate oracle has necessary functions
-        if (IAggregatorInterface(oracle).decimals() != 8) {
-            revert PriceFeedIncompatibleDecimals();
-        }
-        if (IAggregatorInterface(oracle).latestAnswer() == 0) {
-            revert PriceFeedInvalidAnswer();
-        }
-
-        priceOracle[token] = oracle;
-
-        emit SetTokenOracle(token, oracle);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setPriceChecker(address newPriceChecker) external onlyOwner {
-        _setPriceChecker(newPriceChecker);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setLimitOrderPriceChecker(
-        address newPriceChecker
-    ) external onlyOwner {
-        _setLimitOrderPriceChecker(newPriceChecker);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setHandler(address newHandler) external onlyOwner {
-        _setHandler(newHandler);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setRelayer(address newRelayer) external onlyOwner {
-        _setRelayer(newRelayer);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function setMilkman(address newMilkman) external onlyOwner {
-        _setMilkman(newMilkman);
-    }
-
-    /// @inheritdoc IMainnetSwapSteward
-    function getExpectedOut(
-        uint256 amount,
-        address fromToken,
-        address toToken
-    ) public view returns (uint256) {
-        bytes memory data = _getPriceCheckerAndData(
-            priceOracle[fromToken],
-            priceOracle[toToken],
-            0
-        );
-
-        (, bytes memory _data) = abi.decode(data, (uint256, bytes));
-
-        return
-            IPriceChecker(priceChecker)
-                .EXPECTED_OUT_CALCULATOR()
-                .getExpectedOut(amount, fromToken, toToken, _data);
-    }
-
-    /// @notice Internal function that handles swaps
-    /// @param _priceChecker Address of the price checker to validate order
-    /// @param fromToken Address of the token to swap from
-    /// @param toToken Address of the token to swap to
-    /// @param recipient Address of the account receiving the swapped funds
-    /// @param amount The amount of fromToken to swap
-    /// @param priceCheckerData abi-encoded data for price checker
-    function _swap(
-        address _priceChecker,
-        address fromToken,
-        address toToken,
-        address recipient,
-        uint256 amount,
-        bytes memory priceCheckerData
-    ) internal {
-        IERC20(fromToken).forceApprove(milkman, amount);
-
-        IMilkman(milkman).requestSwapExactTokensForTokens(
-            amount,
-            IERC20(fromToken),
-            IERC20(toToken),
-            recipient,
-            bytes32(0),
-            _priceChecker,
-            priceCheckerData
-        );
-    }
-
-    /// @notice Internal function that handles swap cancellations
-    /// @param tradeMilkman Address of the Milkman contract to submit the order
-    /// @param _priceChecker Address of the price checker to validate order
-    /// @param fromToken Address of the token to swap from
-    /// @param toToken Address of the token to swap to
-    /// @param amount The amount of fromToken to swap
-    /// @param priceCheckerData abi-encoded data for price checker
-    function _cancelSwap(
-        address tradeMilkman,
-        address _priceChecker,
-        address fromToken,
-        address toToken,
-        uint256 amount,
-        bytes memory priceCheckerData
-    ) internal {
-        IMilkman(tradeMilkman).cancelSwap(
-            amount,
-            IERC20(fromToken),
-            IERC20(toToken),
-            address(COLLECTOR),
-            bytes32(0),
-            _priceChecker,
-            priceCheckerData
-        );
-
-        IERC20(fromToken).safeTransfer(
-            address(COLLECTOR),
-            IERC20(fromToken).balanceOf(address(this))
-        );
-
-        emit SwapCanceled(fromToken, toToken, amount);
-    }
-
-    /// @notice Helper function to abi-encode data for price checker
-    /// @param fromOracle Address of the oracle to check fromToken price
-    /// @param toOracle Address of the oracle to check toToken price
-    /// @param slippage The allowed slippage compared to the oracle price (in BPS)
-    function _getPriceCheckerAndData(
-        address fromOracle,
-        address toOracle,
-        uint256 slippage
-    ) internal pure returns (bytes memory) {
-        return
-            abi.encode(
-                slippage,
-                _getChainlinkCheckerData(fromOracle, toOracle)
-            );
-    }
-
-    /// @notice Helper function to abi-encode Chainlink oracle data
-    /// @param fromOracle Address of the oracle to check fromToken price
-    /// @param toOracle Address of the oracle to check toToken price
-    function _getChainlinkCheckerData(
-        address fromOracle,
-        address toOracle
-    ) internal pure returns (bytes memory) {
-        address[] memory paths = new address[](2);
-        paths[0] = fromOracle;
-        paths[1] = toOracle;
-
-        bool[] memory reverses = new bool[](2);
-        reverses[1] = true;
-
-        return abi.encode(paths, reverses);
-    }
-
-    /// @dev Internal function to set the price checker
-    function _setPriceChecker(address newPriceChecker) internal {
-        if (newPriceChecker == address(0)) revert InvalidZeroAddress();
-        address old = priceChecker;
-        priceChecker = newPriceChecker;
-
-        emit PriceCheckerUpdated(old, newPriceChecker);
-    }
-
-    /// @dev Internal function to set the price checker
-    function _setLimitOrderPriceChecker(address newPriceChecker) internal {
-        if (newPriceChecker == address(0)) revert InvalidZeroAddress();
-        address old = limitOrderPriceChecker;
-        limitOrderPriceChecker = newPriceChecker;
-
-        emit LimitOrderPriceCheckerUpdated(old, newPriceChecker);
-    }
-
-    /// @dev Internal function to set the Milkman instance address
-    function _setMilkman(address newMilkman) internal {
-        if (newMilkman == address(0)) revert InvalidZeroAddress();
-        address old = milkman;
-        milkman = newMilkman;
-
-        emit MilkmanAddressUpdated(old, newMilkman);
-    }
-
-    /// @dev Internal function to set the Handler instance address
-    function _setHandler(address newHandler) internal {
-        if (newHandler == address(0)) revert InvalidZeroAddress();
-        address old = handler;
-        handler = newHandler;
-
-        emit HandlerAddressUpdated(old, newHandler);
-    }
-
-    /// @dev Internal function to set the Relayer instance address
-    function _setRelayer(address newRelayer) internal {
-        if (newRelayer == address(0)) revert InvalidZeroAddress();
-        address old = relayer;
-        relayer = newRelayer;
-
-        emit RelayerAddressUpdated(old, newRelayer);
-    }
-
-    /// @dev Internal function to check maximum amount
-    function _checkAmount(
-        address fromToken,
-        uint256 amount
-    ) internal view returns (uint256) {
-        if (amount == type(uint256).max) {
-            amount = msg.sender == owner()
-                ? IERC20(fromToken).balanceOf(address(COLLECTOR))
-                : tokenBudget[fromToken];
-        }
-
-        return amount;
-    }
-
-    function _transferTokensIn(
-        address fromToken,
-        uint256 amount
-    ) internal returns (uint256) {
-        COLLECTOR.transfer(IERC20(fromToken), address(this), amount);
-        uint256 swapperBalance = IERC20(fromToken).balanceOf(address(this));
-
-        // some tokens, like stETH, can lose 1-2wei on transfer
-        if (swapperBalance < amount) {
-            amount = swapperBalance;
-        }
-
-        return amount;
-    }
-
-    /// @dev Internal function to validate a swap's parameters
-    function _validateSwap(
-        address fromToken,
-        address toToken,
-        address fromOracle,
-        address toOracle,
-        uint256 amount,
-        uint256 slippage
-    ) internal {
-        if (slippage > MAX_SLIPPAGE) revert InvalidSlippage();
-
-        _validateCommon(fromToken, toToken, amount);
-
-        if (
-            IAggregatorInterface(fromOracle).latestAnswer() == 0 ||
-            IAggregatorInterface(toOracle).latestAnswer() == 0
-        ) {
-            revert PriceFeedInvalidAnswer();
-        }
-    }
-
-    /// @dev internal function to perform common validation of swaps
-    function _validateCommon(
-        address fromToken,
-        address toToken,
-        uint256 amount
-    ) internal {
-        if (amount == 0) revert InvalidZeroAmount();
-        if (!swapApprovedToken[fromToken][toToken]) {
-            revert UnrecognizedTokenSwap();
-        }
-
-        if (msg.sender != owner()) {
-            if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
-            tokenBudget[fromToken] -= amount;
-        }
-    }
+  }
 }
