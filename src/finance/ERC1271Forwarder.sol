@@ -13,8 +13,8 @@ import {GPv2Order} from "src/finance/libraries/GPv2Order.sol";
 abstract contract ERC1271Forwarder {
   IComposableCow public immutable COMPOSABLE_COW;
 
-  constructor(address _composableCow) {
-    COMPOSABLE_COW = IComposableCow(_composableCow);
+  constructor(address composableCow) {
+    COMPOSABLE_COW = IComposableCow(composableCow);
   }
 
   // When the pre-image doesn't match the hash, revert with this error.

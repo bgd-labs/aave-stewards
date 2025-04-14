@@ -61,13 +61,13 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   address public immutable COLLECTOR;
 
   /// @inheritdoc IMainnetSwapSteward
-  address public milkman;
-
-  /// @inheritdoc IMainnetSwapSteward
-  address public handler;
+  address public immutable HANDLER;
 
   /// @inheritdoc IMainnetSwapSteward
   address public relayer;
+
+  /// @inheritdoc IMainnetSwapSteward
+  address public milkman;
 
   /// @inheritdoc IMainnetSwapSteward
   address public priceChecker;
@@ -102,10 +102,10 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     _setMilkman(initialMilkman);
     _setPriceChecker(initialPriceChecker);
     _setLimitOrderPriceChecker(initialLimitOrderPriceChecker);
-    _setHandler(initialHandler);
     _setRelayer(initialRelayer);
 
     COLLECTOR = collector;
+    HANDLER = initialHandler;
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -143,41 +143,40 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   function twapSwap(
     address fromToken,
     address toToken,
-    uint256 sellAmount,
+    uint256 partSellAmount,
     uint256 minPartLimit,
     uint256 startTime,
     uint256 numParts,
     uint256 partDuration,
     uint256 span
   ) external onlyOwnerOrGuardian {
-    uint256 amount = sellAmount * numParts;
-    amount = _checkAmount(fromToken, amount);
+    uint256 amount = partSellAmount * numParts;
 
-    _validateCommon(fromToken, toToken, sellAmount * numParts);
+    _validateCommon(fromToken, toToken, amount);
 
     amount = _transferTokensIn(fromToken, amount);
 
-    IMainnetSwapSteward.TWAPData memory twapData = TWAPData(
-      IERC20(fromToken),
-      IERC20(toToken),
-      COLLECTOR,
-      sellAmount,
-      minPartLimit,
-      startTime,
-      numParts,
-      partDuration,
-      span,
-      bytes32(0)
-    );
+    IMainnetSwapSteward.TWAPData memory twapData = TWAPData({
+      sellToken: IERC20(fromToken),
+      buyToken: IERC20(toToken),
+      receiver: COLLECTOR,
+      partSellAmount: partSellAmount,
+      minPartLimit: minPartLimit,
+      t0: startTime,
+      n: numParts,
+      t: partDuration,
+      span: span,
+      appData: bytes32(0)
+    });
 
     IConditionalOrder.ConditionalOrderParams memory params = IConditionalOrder.ConditionalOrderParams(
-      IConditionalOrder(handler), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
+      IConditionalOrder(HANDLER), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
     );
     COMPOSABLE_COW.create(params, true);
 
-    IERC20(fromToken).forceApprove(relayer, sellAmount * numParts);
+    IERC20(fromToken).forceApprove(relayer, amount);
 
-    emit TWAPSwapRequested(fromToken, toToken, sellAmount * numParts);
+    emit TWAPSwapRequested(fromToken, toToken, amount);
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -222,10 +221,9 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
       bytes32(0)
     );
     IConditionalOrder.ConditionalOrderParams memory params = IConditionalOrder.ConditionalOrderParams(
-      IConditionalOrder(handler), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
+      IConditionalOrder(HANDLER), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
     );
-    bytes32 hashedOrder = COMPOSABLE_COW.hash(params);
-    COMPOSABLE_COW.remove(hashedOrder);
+    COMPOSABLE_COW.remove(keccak256(abi.encode(params)));
 
     emit TWAPSwapCanceled(fromToken, toToken, sellAmount * numParts);
   }
@@ -281,11 +279,6 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   /// @inheritdoc IMainnetSwapSteward
   function setLimitOrderPriceChecker(address newPriceChecker) external onlyOwner {
     _setLimitOrderPriceChecker(newPriceChecker);
-  }
-
-  /// @inheritdoc IMainnetSwapSteward
-  function setHandler(address newHandler) external onlyOwner {
-    _setHandler(newHandler);
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -362,21 +355,18 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     pure
     returns (bytes memory)
   {
-    return abi.encode(slippage, _getChainlinkCheckerData(fromOracle, toOracle));
-  }
-
-  /// @notice Helper function to abi-encode Chainlink oracle data
-  /// @param fromOracle Address of the oracle to check fromToken price
-  /// @param toOracle Address of the oracle to check toToken price
-  function _getChainlinkCheckerData(address fromOracle, address toOracle) internal pure returns (bytes memory) {
     address[] memory paths = new address[](2);
     paths[0] = fromOracle;
     paths[1] = toOracle;
 
+    /// Because the two oracles used have the same base (ie: XXX/USD and YYY/USD), in order to get XXX/YYY
+    /// we put the second element of the secon array as true which will turn it into USD/YYY.
     bool[] memory reverses = new bool[](2);
     reverses[1] = true;
 
-    return abi.encode(paths, reverses);
+    bytes memory chainlinkCheckerData = abi.encode(paths, reverses);
+
+    return abi.encode(slippage, chainlinkCheckerData);
   }
 
   /// @dev Internal function to set the price checker
@@ -404,15 +394,6 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     milkman = newMilkman;
 
     emit MilkmanAddressUpdated(old, newMilkman);
-  }
-
-  /// @dev Internal function to set the Handler instance address
-  function _setHandler(address newHandler) internal {
-    if (newHandler == address(0)) revert InvalidZeroAddress();
-    address old = handler;
-    handler = newHandler;
-
-    emit HandlerAddressUpdated(old, newHandler);
   }
 
   /// @dev Internal function to set the Relayer instance address

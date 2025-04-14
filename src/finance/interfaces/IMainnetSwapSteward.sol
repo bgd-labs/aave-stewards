@@ -48,11 +48,6 @@ interface IMainnetSwapSteward {
   /// @param newAddress The new Milkman instance address
   event MilkmanAddressUpdated(address oldAddress, address newAddress);
 
-  /// @notice Emitted when the Handler contract address is updated
-  /// @param oldAddress The old Handler instance address
-  /// @param newAddress The new Handler instance address
-  event HandlerAddressUpdated(address oldAddress, address newAddress);
-
   /// @notice Emitted when the Relayer contract address is updated
   /// @param oldAddress The old Relayer instance address
   /// @param newAddress The new Relayer instance address
@@ -125,11 +120,11 @@ interface IMainnetSwapSteward {
   /// @notice Returns the maximum allowed slippage for swaps (in BPS)
   function MAX_SLIPPAGE() external view returns (uint256);
 
+  /// @notice Returns address of handler of conditional orders
+  function HANDLER() external view returns (address);
+
   /// @notice Returns the address of the Milkman contract
   function milkman() external view returns (address);
-
-  /// @notice Returns address of handler of conditional orders
-  function handler() external view returns (address);
 
   /// @notice Returns address of the relayer to relay conditional orders
   function relayer() external view returns (address);
@@ -171,16 +166,16 @@ interface IMainnetSwapSteward {
   /// @notice Function to swap one token for another at a time-weighted-average-price
   /// @param fromToken Address of the token to swap
   /// @param toToken Address of the token to receive
-  /// @param sellAmount The amount of tokens to sell per TWAP swap
-  /// @param minPartLimit Minimum amount of toToken to receive per TWAP swap
+  /// @param partSellAmount The amount of tokens to sell per TWAP swap part
+  /// @param minPartLimit Minimum amount of toToken to receive per TWAP swap part
   /// @param startTime Timestamp of when TWAP orders start
-  /// @param numParts Number of TWAP swaps to take place (each for sellAmount)
+  /// @param numParts Number of TWAP swap parts to take place (each for partSellAmount)
   /// @param partDuration How long each TWAP takes (ie: hourly, weekly, etc)
   /// @param span The timeframe the orders can take place in
   function twapSwap(
     address fromToken,
     address toToken,
-    uint256 sellAmount,
+    uint256 partSellAmount,
     uint256 minPartLimit,
     uint256 startTime,
     uint256 numParts,
@@ -233,10 +228,6 @@ interface IMainnetSwapSteward {
   /// @notice Sets the address for the MILKMAN used in swaps
   /// @param to The address of MILKMAN
   function setMilkman(address to) external;
-
-  /// @notice Sets the address for the HANDLER used in swaps
-  /// @param to The address of HANDLER
-  function setHandler(address to) external;
 
   /// @notice Sets the address for the RELAYER used in swaps
   /// @param to The address of RELAYER

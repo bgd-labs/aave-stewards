@@ -118,7 +118,7 @@ contract SwapTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_zeroAmount() public {
+  function test_revertsIf_zeroAmount() public {
     vm.startPrank(guardian);
 
     vm.expectRevert(IMainnetSwapSteward.InvalidZeroAmount.selector);
@@ -126,7 +126,7 @@ contract SwapTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_unrecognizedToken() public {
+  function test_revertsIf_unrecognizedToken() public {
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
 
@@ -136,7 +136,7 @@ contract SwapTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_invalidPriceFeedAnswer() public {
+  function test_revertsIf_invalidPriceFeedAnswer() public {
     address mockOracle = address(new MockOracle());
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
@@ -211,7 +211,7 @@ contract LimitSwapTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_zeroAmount() public {
+  function test_revertsIf_zeroAmount() public {
     vm.startPrank(guardian);
 
     vm.expectRevert(IMainnetSwapSteward.InvalidZeroAmount.selector);
@@ -219,7 +219,7 @@ contract LimitSwapTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_unrecognizedToken() public {
+  function test_revertsIf_unrecognizedToken() public {
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
 
@@ -537,7 +537,7 @@ contract SetSwappablePairTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_sameToken() public {
+  function test_revertsIf_sameToken() public {
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     vm.expectRevert(IMainnetSwapSteward.UnrecognizedTokenSwap.selector);
     steward.setSwappablePair(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.USDC_UNDERLYING);
@@ -562,7 +562,7 @@ contract SetTokenOracleTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
-  function test_resvertsIf_incompatibleOracleMissingImplementations() public {
+  function test_revertsIf_incompatibleOracleMissingImplementations() public {
     address mockOracle = address(new InvalidMockOracle());
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
@@ -648,29 +648,6 @@ contract SetMilkmanTest is MainnetSwapStewardTest {
     steward.setMilkman(newMilkman);
 
     assertEq(steward.milkman(), newMilkman);
-  }
-}
-
-contract SetHandlerTest is MainnetSwapStewardTest {
-  function test_revertsIf_invalidCaller() public {
-    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
-    steward.setHandler(makeAddr("new-handler"));
-  }
-
-  function test_revertsIf_invalidZeroAddress() public {
-    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
-    steward.setHandler(address(0));
-  }
-
-  function test_successful() public {
-    address newHandler = makeAddr("new-handler");
-    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    vm.expectEmit(true, true, true, true, address(steward));
-    emit HandlerAddressUpdated(steward.handler(), newHandler);
-    steward.setHandler(newHandler);
-
-    assertEq(steward.handler(), newHandler);
   }
 }
 
