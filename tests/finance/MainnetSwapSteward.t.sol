@@ -441,6 +441,41 @@ contract TWAPSwapTest is MainnetSwapStewardTest {
     );
   }
 
+  function test_revertsIf_orderExistsAlready() public {
+    _setBudgetAndPath();
+
+    uint256 amount = 1_000e6;
+    uint256 numParts = 5;
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    vm.expectEmit(true, true, true, true, address(steward));
+    emit TWAPSwapRequested(
+      AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, amount * numParts
+    );
+    steward.twapSwap(
+      AaveV3EthereumAssets.USDC_UNDERLYING,
+      AaveV3EthereumAssets.AAVE_UNDERLYING,
+      amount,
+      0.001 ether,
+      block.timestamp,
+      numParts,
+      1 days,
+      0
+    );
+
+    vm.expectRevert(IMainnetSwapSteward.OrderExists.selector);
+    steward.twapSwap(
+      AaveV3EthereumAssets.USDC_UNDERLYING,
+      AaveV3EthereumAssets.AAVE_UNDERLYING,
+      amount,
+      0.001 ether,
+      block.timestamp,
+      numParts,
+      1 days,
+      0
+    );
+    vm.stopPrank();
+  }
+
   function test_successful() public {
     _setBudgetAndPath();
 

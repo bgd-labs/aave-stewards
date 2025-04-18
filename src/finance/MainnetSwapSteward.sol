@@ -7,13 +7,14 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
+
 import {ERC1271Forwarder} from "src/finance/ERC1271Forwarder.sol";
 import {IAggregatorInterface} from "src/finance/interfaces/IAggregatorInterface.sol";
 import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 import {IConditionalOrder} from "src/finance/interfaces/IConditionalOrder.sol";
 import {IMilkman} from "src/finance/interfaces/IMilkman.sol";
-import {IPriceChecker} from "./interfaces/IPriceChecker.sol";
-
+import {IPriceChecker} from "src/finance/interfaces/IPriceChecker.sol";
+import {IComposableCow} from "src/finance/interfaces/IComposableCow.sol";
 import {IMainnetSwapSteward} from "src/finance/interfaces/IMainnetSwapSteward.sol";
 
 /**
@@ -156,6 +157,8 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
 
     amount = _transferTokensIn(fromToken, amount);
 
+    _decreaseBudget(fromToken, amount);
+
     IMainnetSwapSteward.TWAPData memory twapData = TWAPData({
       sellToken: IERC20(fromToken),
       buyToken: IERC20(toToken),
@@ -172,6 +175,11 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     IConditionalOrder.ConditionalOrderParams memory params = IConditionalOrder.ConditionalOrderParams(
       IConditionalOrder(HANDLER), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
     );
+
+    bool orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(address(this), keccak256(abi.encode(params)));
+
+    if (orderExists) revert OrderExists();
+
     COMPOSABLE_COW.create(params, true);
 
     IERC20(fromToken).forceApprove(relayer, amount);
@@ -201,18 +209,21 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   function cancelTwapSwap(
     address fromToken,
     address toToken,
-    uint256 sellAmount,
+    uint256 partSellAmount,
     uint256 minPartLimit,
     uint256 startTime,
     uint256 numParts,
     uint256 partDuration,
     uint256 span
   ) external onlyOwnerOrGuardian {
+    uint256 amount = partSellAmount * numParts;
+    _increaseBudget(fromToken, amount);
+
     TWAPData memory twapData = TWAPData(
       IERC20(fromToken),
       IERC20(toToken),
       COLLECTOR,
-      sellAmount,
+      partSellAmount,
       minPartLimit,
       startTime,
       numParts,
@@ -225,7 +236,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     );
     COMPOSABLE_COW.remove(keccak256(abi.encode(params)));
 
-    emit TWAPSwapCanceled(fromToken, toToken, sellAmount * numParts);
+    emit TWAPSwapCanceled(fromToken, toToken, amount);
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -315,6 +326,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     uint256 amount,
     bytes memory priceCheckerData
   ) internal {
+    _decreaseBudget(fromToken, amount);
     IERC20(fromToken).forceApprove(milkman, amount);
 
     IMilkman(milkman).requestSwapExactTokensForTokens(
@@ -337,6 +349,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     uint256 amount,
     bytes memory priceCheckerData
   ) internal {
+    _increaseBudget(fromToken, amount);
     IMilkman(tradeMilkman).cancelSwap(
       amount, IERC20(fromToken), IERC20(toToken), COLLECTOR, bytes32(0), _priceChecker, priceCheckerData
     );
@@ -419,11 +432,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     uint256 swapperBalance = IERC20(fromToken).balanceOf(address(this));
 
     // some tokens, like stETH, can lose 1-2wei on transfer
-    if (swapperBalance < amount) {
-      amount = swapperBalance;
-    }
-
-    return amount;
+    return swapperBalance < amount ? swapperBalance : amount;
   }
 
   /// @dev Internal function to validate a swap's parameters
@@ -434,7 +443,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     address toOracle,
     uint256 amount,
     uint256 slippage
-  ) internal {
+  ) internal view {
     if (slippage > MAX_SLIPPAGE) revert InvalidSlippage();
 
     _validateCommon(fromToken, toToken, amount);
@@ -444,16 +453,26 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     }
   }
 
-  /// @dev internal function to perform common validation of swaps
-  function _validateCommon(address fromToken, address toToken, uint256 amount) internal {
+  /// @dev Internal function to perform common validation of swaps
+  function _validateCommon(address fromToken, address toToken, uint256 amount) internal view {
     if (amount == 0) revert InvalidZeroAmount();
     if (!swapApprovedToken[fromToken][toToken]) {
       revert UnrecognizedTokenSwap();
     }
+  }
 
+  /// @dev Internal function to decrease token budget
+  function _decreaseBudget(address fromToken, uint256 amount) internal {
     if (msg.sender != owner()) {
       if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
       tokenBudget[fromToken] -= amount;
+    }
+  }
+
+  /// @dev Internal function to increase token budget
+  function _increaseBudget(address fromToken, uint256 amount) internal {
+    if (msg.sender != owner()) {
+      tokenBudget[fromToken] += amount;
     }
   }
 }
