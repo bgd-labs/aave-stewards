@@ -43,6 +43,7 @@ contract MainnetSwapStewardTest is Test {
   event UpdatedTokenBudget(address indexed token, uint256 budget);
 
   address public constant USDC_PRICE_FEED = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+  address public constant USDT_PRICE_FEED = 0xC26D4a1c46d884cfF6dE9800B6aE7A8Cf48B4Ff8;
   address public constant AAVE_PRICE_FEED = 0x547a514d5e3769680Ce22B2361c10Ea13619e8a9;
   address public constant EXECUTOR = 0x5300A1a15135EA4dc7aD5a167152C01EFc9b192A;
 
@@ -107,7 +108,141 @@ contract MainnetSwapStewardTest is Test {
   }
 }
 
-contract ConstructorTest is Test {}
+contract ConstructorTest is Test {
+  address public constant EXECUTOR = 0x5300A1a15135EA4dc7aD5a167152C01EFc9b192A;
+  address public constant MILKMAN = 0x060373D064d0168931dE2AB8DDA7410923d06E88;
+  address public constant PRICE_CHECKER = 0xe80a1C615F75AFF7Ed8F08c9F21f9d00982D666c;
+  address public constant LIMIT_ORDER_PRICE_CHECKER = 0xcfb9Bc9d2FA5D3Dd831304A0AE53C76ed5c64802;
+  address public constant COMPOSABLE_COW = 0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74;
+  address public constant TWAP_HANDLER = 0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5;
+  address public constant COW_RELAYER = 0xC92E8bdf79f0507f65a392b0ab4667716BFE0110;
+
+  function test_revertsIf_collectorIsZeroAddress() public {
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+    new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(0),
+      MILKMAN,
+      PRICE_CHECKER,
+      LIMIT_ORDER_PRICE_CHECKER,
+      COMPOSABLE_COW,
+      TWAP_HANDLER,
+      COW_RELAYER
+    );
+  }
+
+  function test_revertsIf_milkmanIsZeroAddress() public {
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+    new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(AaveV3Ethereum.COLLECTOR),
+      address(0),
+      PRICE_CHECKER,
+      LIMIT_ORDER_PRICE_CHECKER,
+      COMPOSABLE_COW,
+      TWAP_HANDLER,
+      COW_RELAYER
+    );
+  }
+
+  function test_revertsIf_priceCheckerIsZeroAddress() public {
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+    new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(AaveV3Ethereum.COLLECTOR),
+      MILKMAN,
+      address(0),
+      LIMIT_ORDER_PRICE_CHECKER,
+      COMPOSABLE_COW,
+      TWAP_HANDLER,
+      COW_RELAYER
+    );
+  }
+
+  function test_revertsIf_limitPriceCheckerIsZeroAddress() public {
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+    new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(AaveV3Ethereum.COLLECTOR),
+      MILKMAN,
+      PRICE_CHECKER,
+      address(0),
+      COMPOSABLE_COW,
+      TWAP_HANDLER,
+      COW_RELAYER
+    );
+  }
+
+  function test_revertsIf_composableCowIsZeroAddress() public {
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+    new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(AaveV3Ethereum.COLLECTOR),
+      MILKMAN,
+      PRICE_CHECKER,
+      LIMIT_ORDER_PRICE_CHECKER,
+      address(0),
+      TWAP_HANDLER,
+      COW_RELAYER
+    );
+  }
+
+  function test_revertsIf_handlerIsZeroAddress() public {
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+    new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(AaveV3Ethereum.COLLECTOR),
+      MILKMAN,
+      PRICE_CHECKER,
+      LIMIT_ORDER_PRICE_CHECKER,
+      COMPOSABLE_COW,
+      address(0),
+      COW_RELAYER
+    );
+  }
+
+  function test_revertsIf_relayerIsZeroAddress() public {
+    vm.expectRevert(IMainnetSwapSteward.InvalidZeroAddress.selector);
+    new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(AaveV3Ethereum.COLLECTOR),
+      MILKMAN,
+      PRICE_CHECKER,
+      LIMIT_ORDER_PRICE_CHECKER,
+      COMPOSABLE_COW,
+      TWAP_HANDLER,
+      address(0)
+    );
+  }
+
+  function test_successful() public {
+    MainnetSwapSteward steward = new MainnetSwapSteward(
+      GovernanceV3Ethereum.EXECUTOR_LVL_1,
+      makeAddr("guardian"),
+      address(AaveV3Ethereum.COLLECTOR),
+      MILKMAN,
+      PRICE_CHECKER,
+      LIMIT_ORDER_PRICE_CHECKER,
+      COMPOSABLE_COW,
+      TWAP_HANDLER,
+      COW_RELAYER
+    );
+
+    assertEq(steward.COLLECTOR(), address(AaveV3Ethereum.COLLECTOR));
+    assertEq(steward.milkman(), MILKMAN);
+    assertEq(steward.priceChecker(), PRICE_CHECKER);
+    assertEq(steward.limitOrderPriceChecker(), LIMIT_ORDER_PRICE_CHECKER);
+    assertEq(steward.HANDLER(), TWAP_HANDLER);
+    assertEq(steward.relayer(), COW_RELAYER);
+  }
+}
 
 contract SwapTest is MainnetSwapStewardTest {
   function test_revertsIf_notOwnerOrQuardian() public {
@@ -257,6 +392,15 @@ contract LimitSwapTest is MainnetSwapStewardTest {
     vm.stopPrank();
   }
 
+  function test_revertsIf_insufficientBudget() public {
+    _setBudgetAndPath();
+
+    vm.startPrank(guardian);
+    vm.expectRevert(IMainnetSwapSteward.InsufficientBudget.selector);
+    steward.limitSwap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 2_000e6, 900e6);
+    vm.stopPrank();
+  }
+
   function test_success() public {
     _setBudgetAndPath();
 
@@ -302,7 +446,9 @@ contract CancelSwapTest is MainnetSwapStewardTest {
   function test_successful() public {
     _setBudgetAndPath();
 
-    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    uint256 budgetBefore = steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING);
+
+    vm.startPrank(guardian);
     vm.expectEmit(true, true, true, true, address(steward));
     emit SwapRequested(
       AaveV3EthereumAssets.USDC_UNDERLYING,
@@ -314,6 +460,8 @@ contract CancelSwapTest is MainnetSwapStewardTest {
     );
     steward.swap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6, 200);
 
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - 1_000e6);
+
     vm.expectEmit(true, true, true, true, address(steward));
     emit SwapCanceled(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6);
     steward.cancelSwap(
@@ -323,6 +471,8 @@ contract CancelSwapTest is MainnetSwapStewardTest {
       1_000e6,
       200
     );
+
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore);
     vm.stopPrank();
   }
 }
@@ -360,10 +510,15 @@ contract CancelLimitSwapTest is MainnetSwapStewardTest {
   function test_successful() public {
     _setBudgetAndPath();
 
-    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    vm.startPrank(guardian);
+
+    uint256 budgetBefore = steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING);
+
     vm.expectEmit(true, true, true, true, address(steward));
     emit LimitSwapRequested(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6, 900e6);
     steward.limitSwap(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6, 900e6);
+
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - 1_000e6);
 
     vm.expectEmit(true, true, true, true, address(steward));
     emit SwapCanceled(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, 1_000e6);
@@ -374,6 +529,9 @@ contract CancelLimitSwapTest is MainnetSwapStewardTest {
       1_000e6,
       900e6
     );
+
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore);
+
     vm.stopPrank();
   }
 }
@@ -439,6 +597,26 @@ contract TWAPSwapTest is MainnetSwapStewardTest {
       1 days,
       0
     );
+  }
+
+  function test_revertsIf_insufficientBudget() public {
+    _setBudgetAndPath();
+
+    uint256 amount = 1_000e6;
+    uint256 numParts = 5;
+    vm.startPrank(guardian);
+    vm.expectRevert(IMainnetSwapSteward.InsufficientBudget.selector);
+    steward.twapSwap(
+      AaveV3EthereumAssets.USDC_UNDERLYING,
+      AaveV3EthereumAssets.AAVE_UNDERLYING,
+      amount,
+      0.001 ether,
+      block.timestamp,
+      numParts,
+      1 days,
+      0
+    );
+    vm.stopPrank();
   }
 
   function test_revertsIf_orderExistsAlready() public {
@@ -519,10 +697,15 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
   function test_successful() public {
     _setBudgetAndPath();
 
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 5_000e6);
+    vm.stopPrank();
+
     uint256 amount = 1_000e6;
     uint256 numParts = 5;
+    uint256 budgetBefore = steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING);
 
-    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    vm.startPrank(guardian);
     steward.twapSwap(
       AaveV3EthereumAssets.USDC_UNDERLYING,
       AaveV3EthereumAssets.AAVE_UNDERLYING,
@@ -540,6 +723,7 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
       address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
     );
 
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - (amount * numParts));
     assertTrue(orderExists, "Order does not exist");
 
     vm.expectEmit(true, true, true, true, address(steward));
@@ -559,6 +743,8 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
     orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
       address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
     );
+
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore);
     assertFalse(orderExists, "Order exists after removing");
     vm.stopPrank();
   }
@@ -777,6 +963,20 @@ contract SetTokenBudget is MainnetSwapStewardTest {
     vm.expectEmit(true, true, true, true, address(steward));
     emit UpdatedTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
     steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+  }
+}
+
+contract GetExpectedOutTest is MainnetSwapStewardTest {
+  function test_successful() public {
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
+    steward.setTokenOracle(AaveV3EthereumAssets.USDT_UNDERLYING, USDT_PRICE_FEED);
+
+    assertApproxEqAbs(
+      steward.getExpectedOut(1_000e6, AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.USDT_UNDERLYING),
+      1_000e6,
+      1e6
+    );
   }
 }
 

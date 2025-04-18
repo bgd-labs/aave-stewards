@@ -99,6 +99,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     if (collector == address(0)) revert InvalidZeroAddress();
     if (initialHandler == address(0)) revert InvalidZeroAddress();
     if (initialRelayer == address(0)) revert InvalidZeroAddress();
+    if (initialComposableCow == address(0)) revert InvalidZeroAddress();
 
     _setMilkman(initialMilkman);
     _setPriceChecker(initialPriceChecker);
