@@ -98,7 +98,6 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   ) OwnableWithGuardian(initialOwner, initialGuardian) ERC1271Forwarder(initialComposableCow) {
     if (collector == address(0)) revert InvalidZeroAddress();
     if (initialHandler == address(0)) revert InvalidZeroAddress();
-    if (initialRelayer == address(0)) revert InvalidZeroAddress();
     if (initialComposableCow == address(0)) revert InvalidZeroAddress();
 
     _setMilkman(initialMilkman);
@@ -236,6 +235,8 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
       IConditionalOrder(HANDLER), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
     );
     COMPOSABLE_COW.remove(keccak256(abi.encode(params)));
+    IERC20(fromToken).forceApprove(relayer, amount);
+    IERC20(fromToken).transfer(COLLECTOR, IERC20(fromToken).balanceOf(address(this)));
 
     emit TWAPSwapCanceled(fromToken, toToken, amount);
   }
@@ -248,7 +249,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   }
 
   /// @inheritdoc IMainnetSwapSteward
-  function rescueToken(address token) external {
+  function rescueToken(address token) external onlyOwnerOrGuardian {
     _emergencyTokenTransfer(token, COLLECTOR, type(uint256).max);
   }
 
@@ -274,7 +275,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     if (IAggregatorInterface(oracle).decimals() != 8) {
       revert PriceFeedIncompatibleDecimals();
     }
-    if (IAggregatorInterface(oracle).latestAnswer() == 0) {
+    if (IAggregatorInterface(oracle).latestAnswer() <= 0) {
       revert PriceFeedInvalidAnswer();
     }
 
@@ -374,7 +375,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     paths[1] = toOracle;
 
     /// Because the two oracles used have the same base (ie: XXX/USD and YYY/USD), in order to get XXX/YYY
-    /// we put the second element of the secon array as true which will turn it into USD/YYY.
+    /// we put the second element of the array as true which will turn it into USD/YYY.
     bool[] memory reverses = new bool[](2);
     reverses[1] = true;
 
@@ -467,6 +468,8 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     if (msg.sender != owner()) {
       if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
       tokenBudget[fromToken] -= amount;
+
+      emit UpdatedTokenBudget(fromToken, tokenBudget[fromToken]);
     }
   }
 
@@ -474,6 +477,8 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   function _increaseBudget(address fromToken, uint256 amount) internal {
     if (msg.sender != owner()) {
       tokenBudget[fromToken] += amount;
+
+      emit UpdatedTokenBudget(fromToken, tokenBudget[fromToken]);
     }
   }
 }

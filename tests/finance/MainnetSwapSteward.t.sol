@@ -896,25 +896,9 @@ contract SetRelayerTest is MainnetSwapStewardTest {
 }
 
 contract RescueTokenTest is MainnetSwapStewardTest {
-  function test_successful_permissionless() public {
-    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), 0);
-
-    uint256 aaveAmount = 1_000e18;
-
-    deal(AaveV2EthereumAssets.AAVE_UNDERLYING, address(steward), aaveAmount);
-
-    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), aaveAmount);
-
-    uint256 initialCollectorAaveBalance =
-      IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR));
-
+  function test_revertsIf_invalidCaller() public {
+    vm.expectRevert(abi.encodeWithSelector(IWithGuardian.OnlyGuardianOrOwnerInvalidCaller.selector, address(this)));
     steward.rescueToken(AaveV2EthereumAssets.AAVE_UNDERLYING);
-
-    assertEq(
-      IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(AaveV2Ethereum.COLLECTOR)),
-      initialCollectorAaveBalance + aaveAmount
-    );
-    assertEq(IERC20(AaveV2EthereumAssets.AAVE_UNDERLYING).balanceOf(address(steward)), 0);
   }
 
   function test_successful_governanceCaller() public {

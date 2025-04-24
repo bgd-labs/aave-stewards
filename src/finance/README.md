@@ -6,18 +6,20 @@ Some examples include the BAL <> AAVE swap from 2022, the acquisition of CRV or 
 All the instances listed above required significant time to develop, test, and review, all while reinventing the
 wheel every time for something that should be easy to reuse.
 
-AaveSwapper facilitates swaps of tokens by the DAO without the constant need to review the contracts that do so.
+MainnetSwapSteward facilitates swaps of tokens by the DAO without the constant need to review the contracts that do so.
 
 ## How It Works
 
-AaveSwapper relies on [Milkman](https://github.com/charlesndalton/milkman), a smart contract that builds on top of
+The MainnetSwapSteward relies on [Milkman](https://github.com/charlesndalton/milkman), a smart contract that builds on top of
 [COW Swap](https://swap.cow.fi/#/faq/protocol), under the hood in order to find the best possible swap execution for
 the DAO while protecting funds from MEV exploits and bad slippage.
 
-AaveSwapper is a permissioned smart contract, and it has two potential privileged users: the owner and the guardian.
+MainnetSwapSteward is a permissioned smart contract, and it has two potential privileged users: the owner and the guardian.
 The owner will be the DAO (however, ownership can be transferred) and the guardian is an address to be chosen by the
-DAO to more easily cancel swaps without relying on governance. AaveSwapper can hold funds and swap for other tokens
-and keep them in case the DAO chooses so. AaveSwapper can only withdraw tokens to the Collector contract.
+DAO to more easily swap/cancel swaps without relying on governance. MainnetSwapSteward can only withdraw tokens to the Collector contract.
+The contract has a budget if functions are called by the guardian, which are set by the DAO. This prevents such a behavior as a looping where the DAO's
+funds are drained because of paying slippage in an endless GHO -> USDC -> GHO loop (as an example).
+Funds must be present in this contract in order for them to be executed.
 
 ### Methods
 
@@ -79,10 +81,10 @@ function limitSwap(
     address recipient,
     uint256 amount,
     uint256 amountOut
-  ) external onlyOwner
+  ) external onlyOwnerOrGuardian
 ```
 
-Limit orders are used when wanting a specific price and not minding leaving an order open. When dealing with DAO swaps, knowing the price 5 days in advance is hard, and maybe relying on oracles is not what the DAO wants, especially dealing with low-liquidty tokens, or big orders that might move the market a lot but not the Oracle reference price.
+Limit orders are used when wanting a specific price and not minding leaving an order open. When dealing with DAO swaps, knowing the price 5 days in advance is hard, and maybe relying on oracles is not what the DAO wants, especially dealing with low-liquidity tokens, or big orders that might move the market a lot but not the Oracle reference price.
 
 The `amountOut` here is in the token that is to be RECEIVED. For example, let's say we want to swap 1 wETH for USDC, and the price is $2,000, and we want to get that or better, we would specify the swap in terms of the USDC to be received, in this case, 2,000 USDC. The `amountOut` is measured in the smallest atom of the currency. For tokens with 18 decimals, this would be quotedin wei. For 6 decimals, it would be in 0.000001 increments.
 
@@ -93,14 +95,41 @@ Swap fees/gas costs need to be taken into account, especially for smaller orders
 Limit orders are best suited for stable-to-stable swaps, especially bigger orders as the gas costs are going to be a tiny franction and swaps are likely to occurr rather easily.
 
 ```
-function cancelSwap(
-    address tradeMilkman,
-    address priceChecker,
+ function twapSwap(
     address fromToken,
     address toToken,
-    address fromOracle,
-    address toOracle,
-    address recipient,
+    uint256 partSellAmount,
+    uint256 minPartLimit,
+    uint256 startTime,
+    uint256 numParts,
+    uint256 partDuration,
+    uint256 span
+  ) external onlyOwnerOrGuardian {
+```
+
+TWAP (or time-weighted average price) orders are used when wanting to average a certain price for a swap. For example, let's say the DAO wants to acquire TokenX but the DAO wants to do periodical purchases in order to get an average price and not worry about fluctuations. With TWAP orders, the DAO could for example purchase a certain amount of TokenX every Monday, every hour, or every first of the month.
+
+`fromToken` is the token the user wants to sell, and `toToken` is the token that is to be acquired. `recipient` is the address that will receive the tokens, which is likely to be the Aave V3 Ethereum Collector.
+
+For the TWAP specific orders, the parameters and their explanation are as follows:
+
+`partSellAmount` is the amount of tokens of `fromToken` to be sold each time. For example, let's say the DAO wants to sell 100,000 units of DAI every week for one month, then `sellAmount` would be 25,000, as there will be 4 swaps total.
+
+`minPartLimit` is the minimum amount the DAO is willing to accept per order. For example, following the above example, and with WETH trading at 2,000, which would yield 50 WETH (or 12.5 per each of the four orders), the minimum the DAO is willing to take is 12 (or 10, or anything).
+
+`startTime` is when the orders can first take effect, in unix epoch seconds. For example, the DAO wants the orders to take place on Mondays, and the proposal is to be executed on a Sunday, one can specify the `startTime` as block.timestamp + 1 day to ensure it's on Monday.
+
+`numParts` is the number of swaps to take place. In the example referenced above, this would be 4, to do a weekly swap for a month.
+
+`partDuration` is how long to wait until the next order. Again, using the example above, this would be the uint256 representation of 1 week. If the DAO wanted daily buys, this would be 1 day in uint256.
+
+`span` is to allow some extra customization on time of day, or days of the week the swaps will take place. Using the daily purchases example, the day has 86400 seconds, if the DAO only wanted to swap during the first half of the day, `span` would be set to 43200. The value 0 means the order can take place anytime during the interval (anytime during the day, week, month, etc).
+
+```
+function cancelSwap(
+    address tradeMilkman,
+    address fromToken,
+    address toToken,
     uint256 amount,
     uint256 slippage
 ) external onlyOwnerOrGuardian
@@ -110,6 +139,36 @@ This methods cancels a pending trade. Trades should take just a couple of minute
 should assume something's off (bad slippage, market has moved too much), and should probably reach out via Telegram to the COW Swap team who will give extra insights.
 
 Most likely, this function will be called when a swap is not getting executed because slippage might be too tight and there's no match for it.
+
+```
+function cancelLimitSwap(
+    address tradeMilkman,
+    address fromToken,
+    address toToken,
+    uint256 amount,
+    uint256 amountOut
+  ) external onlyOwnerOrGuardian
+```
+
+This methods cancels a pending limit trade. Trades should take just a couple of minutes to be picked up and traded, so if something's not right, the user
+should think that something might be off.
+
+For limit orders, keep in mind the price might be at the the limit price, but having to account for the cost of the swap might need the price to move a bit further. This should not matter for big swaps but it could be a thing in smaller swaps (especially around test swaps for validation).
+
+```
+function cancelTwapSwap(
+    address fromToken,
+    address toToken,
+    uint256 partSellAmount,
+    uint256 minPartLimit,
+    uint256 startTime,
+    uint256 numParts,
+    uint256 partDuration,
+    uint256 span
+  ) external onlyOwnerOrGuardian
+```
+
+This method cancels a pending TWAP swap. Portions that have already happened will not be reimbursed, but any subsequent ones will be cancelled.
 
 ```
 
@@ -127,26 +186,7 @@ Get the expected amount of tokens when doing a swap. Informational only.
 
 `function emergencyTokenTransfer(address token, address recipient, uint256 amount) external onlyRescueGuardian`
 
-Withdrawal function for funds to leave AaveCurator. Only the owner can call this function.
-
-```
-  function _getPriceCheckerAndData(
-    address fromToken,
-    address toToken,
-    uint256 slippage
-) internal view returns (address, bytes memory)
-```
-
-Read-only function to get an idea of how many tokens to expect when performing a swap. This helper can be used
-to determine the slippage percentage to submit on the swap.
-
-### Potential Extensions
-
-This library includes some abstract payloads to be used by developers to more easily swap and then handle the acquired assets.
-
-`function deposit(address token, uint256 amount) external onlyOwnerOrGuardian`
-
-Deposits funds held on AaveCurator into Aave V2/Aave V3 on behalf of the Collector, depending on the payload used.
+Function for withdrawing tokens from `MainnetSwapSteward` to `Collector`.
 
 ### Deployed Addresses
 
@@ -159,6 +199,8 @@ Mainnet: [`0x`]()
 
 ### Sample Swaps
 
+#### Regular Swap
+
 #### Limit Swaps
 
 Sample ERC20 to ERC20 swap with 18 decimals: https://explorer.cow.fi/address/0x75a37623F8308eDaA2C21D8B51B91393A9E4033a
@@ -167,3 +209,5 @@ https://etherscan.io/tx/0x2186f0cabbbf1930b436783eca69328bfa5a7453c1c7d9a6ed9d78
 Sample ERC20 to ERC20 swap with 6 decimals:
 https://explorer.cow.fi/address/0x141764c308997ec2a3AFE2cBAA1307610b126c01
 https://etherscan.io/tx/0x135a6218866f050634bf52e699b93a9374c12cba19d2de104aa8296e86d0ce51
+
+##### TWAP Swap
