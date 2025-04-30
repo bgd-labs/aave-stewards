@@ -100,7 +100,7 @@ contract MainnetSwapStewardTest is Test {
 
   function _setBudgetAndPath() internal {
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
     steward.setSwappablePair(AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING);
     steward.setTokenOracle(AaveV3EthereumAssets.USDC_UNDERLYING, USDC_PRICE_FEED);
     steward.setTokenOracle(AaveV3EthereumAssets.AAVE_UNDERLYING, AAVE_PRICE_FEED);
@@ -263,7 +263,7 @@ contract SwapTest is MainnetSwapStewardTest {
 
   function test_revertsIf_unrecognizedToken() public {
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
 
     vm.startPrank(guardian);
     vm.expectRevert(IMainnetSwapSteward.UnrecognizedTokenSwap.selector);
@@ -356,7 +356,7 @@ contract LimitSwapTest is MainnetSwapStewardTest {
 
   function test_revertsIf_unrecognizedToken() public {
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
 
     vm.startPrank(guardian);
     vm.expectRevert(IMainnetSwapSteward.UnrecognizedTokenSwap.selector);
@@ -690,6 +690,7 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
       block.timestamp,
       5,
       1 days,
+      0,
       0
     );
   }
@@ -698,12 +699,14 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
     _setBudgetAndPath();
 
     vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 5_000e6);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 5_000e6);
     vm.stopPrank();
 
     uint256 amount = 1_000e6;
     uint256 numParts = 5;
     uint256 budgetBefore = steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING);
+
+    uint256 initialTimestamp = block.timestamp;
 
     vm.startPrank(guardian);
     steward.twapSwap(
@@ -711,7 +714,7 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
       AaveV3EthereumAssets.AAVE_UNDERLYING,
       amount,
       0.001 ether,
-      block.timestamp,
+      initialTimestamp,
       numParts,
       1 days,
       0
@@ -734,9 +737,10 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
       AaveV3EthereumAssets.AAVE_UNDERLYING,
       amount,
       0.001 ether,
-      block.timestamp,
+      initialTimestamp,
       numParts,
       1 days,
+      0,
       0
     );
 
@@ -745,6 +749,71 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
     );
 
     assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore);
+    assertFalse(orderExists, "Order exists after removing");
+    vm.stopPrank();
+  }
+
+  function test_successful_cancelAfterPartExecuted() public {
+    _setBudgetAndPath();
+
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 5_000e6);
+    vm.stopPrank();
+
+    uint256 amount = 1_000e6;
+    uint256 numParts = 5;
+    uint256 budgetBefore = steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING);
+
+    uint256 initialTimestamp = block.timestamp;
+
+    vm.prank(guardian);
+    steward.twapSwap(
+      AaveV3EthereumAssets.USDC_UNDERLYING,
+      AaveV3EthereumAssets.AAVE_UNDERLYING,
+      amount,
+      0.001 ether,
+      initialTimestamp,
+      numParts,
+      1 days,
+      0
+    );
+
+    // Creating this order yields the following order hash:
+    // 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
+    bool orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
+      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
+    );
+
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - (amount * numParts));
+    assertTrue(orderExists, "Order does not exist");
+
+    vm.warp(block.timestamp + 1 days);
+    vm.prank(COW_RELAYER);
+    IERC20(AaveV3EthereumAssets.USDC_UNDERLYING).transferFrom(address(steward), COW_RELAYER, amount);
+
+    vm.expectEmit(true, true, true, true, address(steward));
+    emit TWAPSwapCanceled(
+      AaveV3EthereumAssets.USDC_UNDERLYING, AaveV3EthereumAssets.AAVE_UNDERLYING, amount * (numParts - 1)
+    );
+
+    vm.prank(guardian);
+    steward.cancelTwapSwap(
+      AaveV3EthereumAssets.USDC_UNDERLYING,
+      AaveV3EthereumAssets.AAVE_UNDERLYING,
+      amount,
+      0.001 ether,
+      initialTimestamp,
+      numParts,
+      1 days,
+      0,
+      1
+    );
+
+    orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
+      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
+    );
+
+    assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - amount);
     assertFalse(orderExists, "Order exists after removing");
     vm.stopPrank();
   }
@@ -936,17 +1005,39 @@ contract MaxRescueTest is MainnetSwapStewardTest {
   }
 }
 
-contract SetTokenBudget is MainnetSwapStewardTest {
+contract IncreaseTokenBudget is MainnetSwapStewardTest {
   function test_revertsIf_invalidCaller() public {
     vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
-    steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
   }
 
   function test_successful() public {
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
     vm.expectEmit(true, true, true, true, address(steward));
     emit UpdatedTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
-    steward.setTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+  }
+}
+
+contract DecreaseTokenBudget is MainnetSwapStewardTest {
+  function test_revertsIf_invalidCaller() public {
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
+    steward.decreaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+  }
+
+  function test_revertsIf_insufficientBudget() public {
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    vm.expectRevert(IMainnetSwapSteward.InsufficientBudget.selector);
+    steward.decreaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+  }
+
+  function test_successful() public {
+    vm.startPrank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
+    steward.increaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 2_000e6);
+
+    vm.expectEmit(true, true, true, true, address(steward));
+    emit UpdatedTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
+    steward.decreaseTokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING, 1_000e6);
   }
 }
 

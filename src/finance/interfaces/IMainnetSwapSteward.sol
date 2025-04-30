@@ -213,6 +213,7 @@ interface IMainnetSwapSteward {
   /// @param numParts Number of TWAP swaps to take place (each for partSellAmount)
   /// @param partDuration How long each TWAP part takes (ie: hourly, weekly, etc)
   /// @param span The timeframe the orders can take place in
+  /// @param executedParts The number of parts that have already been executed
   function cancelTwapSwap(
     address fromToken,
     address toToken,
@@ -221,7 +222,8 @@ interface IMainnetSwapSteward {
     uint256 startTime,
     uint256 numParts,
     uint256 partDuration,
-    uint256 span
+    uint256 span,
+    uint256 executedParts
   ) external;
 
   /// @notice Rescues the specified token back to the Collector
@@ -249,10 +251,15 @@ interface IMainnetSwapSteward {
   /// @param toToken The address of the token to swap to
   function setSwappablePair(address fromToken, address toToken) external;
 
+  /// @notice Increases a token's budget (the maximum that can be swapped from)
+  /// @param token The address of the token to increase the budget for
+  /// @param budget The extra amount of token that can be swapped from
+  function increaseTokenBudget(address token, uint256 budget) external;
+
   /// @notice Sets a token's budget (the maximum that can be swapped from)
-  /// @param token The address of the token to set the budget for
-  /// @param budget The amount of token that can be swapped from
-  function setTokenBudget(address token, uint256 budget) external;
+  /// @param token The address of the token to decrease the budget for
+  /// @param budget The extra amount of token that can no longer be swapped from
+  function decreaseTokenBudget(address token, uint256 budget) external;
 
   /// @notice Sets a token's Chainlink Oracle (in USD)
   /// @param token The address of the token

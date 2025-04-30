@@ -157,7 +157,9 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
 
     amount = _transferTokensIn(fromToken, amount);
 
-    _decreaseBudget(fromToken, amount);
+    if (msg.sender != owner()) {
+      _decreaseBudget(fromToken, amount);
+    }
 
     IMainnetSwapSteward.TWAPData memory twapData = TWAPData({
       sellToken: IERC20(fromToken),
@@ -214,38 +216,53 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     uint256 startTime,
     uint256 numParts,
     uint256 partDuration,
-    uint256 span
+    uint256 span,
+    uint256 executedParts
   ) external onlyOwnerOrGuardian {
-    uint256 amount = partSellAmount * numParts;
-    _increaseBudget(fromToken, amount);
+    uint256 amountRemaining = partSellAmount * (numParts - executedParts);
+    if (msg.sender != owner()) {
+      _increaseBudget(fromToken, amountRemaining);
+    }
 
-    TWAPData memory twapData = TWAPData(
-      IERC20(fromToken),
-      IERC20(toToken),
-      COLLECTOR,
-      partSellAmount,
-      minPartLimit,
-      startTime,
-      numParts,
-      partDuration,
-      span,
-      bytes32(0)
+    TWAPData memory twapData = TWAPData({
+      sellToken: IERC20(fromToken),
+      buyToken: IERC20(toToken),
+      receiver: COLLECTOR,
+      partSellAmount: partSellAmount,
+      minPartLimit: minPartLimit,
+      t0: startTime,
+      n: numParts,
+      t: partDuration,
+      span: span,
+      appData: bytes32(0)
+    });
+    COMPOSABLE_COW.remove(
+      keccak256(
+        abi.encode(
+          IConditionalOrder.ConditionalOrderParams(
+            IConditionalOrder(HANDLER), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
+          )
+        )
+      )
     );
-    IConditionalOrder.ConditionalOrderParams memory params = IConditionalOrder.ConditionalOrderParams(
-      IConditionalOrder(HANDLER), "AaveSwapper-TWAP-Swap", abi.encode(twapData)
-    );
-    COMPOSABLE_COW.remove(keccak256(abi.encode(params)));
-    IERC20(fromToken).forceApprove(relayer, amount);
-    IERC20(fromToken).transfer(COLLECTOR, IERC20(fromToken).balanceOf(address(this)));
 
-    emit TWAPSwapCanceled(fromToken, toToken, amount);
+    uint256 allowance = IERC20(fromToken).allowance(address(this), relayer);
+    uint256 toApprove = allowance > amountRemaining ? allowance - amountRemaining : 0;
+
+    IERC20(fromToken).forceApprove(relayer, toApprove);
+    IERC20(fromToken).transfer(COLLECTOR, amountRemaining);
+
+    emit TWAPSwapCanceled(fromToken, toToken, amountRemaining);
   }
 
   /// @inheritdoc IMainnetSwapSteward
-  function setTokenBudget(address token, uint256 budget) external onlyOwner {
-    tokenBudget[token] = budget;
+  function increaseTokenBudget(address token, uint256 budget) external onlyOwner {
+    _increaseBudget(token, budget);
+  }
 
-    emit UpdatedTokenBudget(token, budget);
+  /// @inheritdoc IMainnetSwapSteward
+  function decreaseTokenBudget(address token, uint256 budget) external onlyOwner {
+    _decreaseBudget(token, budget);
   }
 
   /// @inheritdoc IMainnetSwapSteward
@@ -328,7 +345,10 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     uint256 amount,
     bytes memory priceCheckerData
   ) internal {
-    _decreaseBudget(fromToken, amount);
+    if (msg.sender != owner()) {
+      _decreaseBudget(fromToken, amount);
+    }
+
     IERC20(fromToken).forceApprove(milkman, amount);
 
     IMilkman(milkman).requestSwapExactTokensForTokens(
@@ -351,7 +371,10 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
     uint256 amount,
     bytes memory priceCheckerData
   ) internal {
-    _increaseBudget(fromToken, amount);
+    if (msg.sender != owner()) {
+      _increaseBudget(fromToken, amount);
+    }
+
     IMilkman(tradeMilkman).cancelSwap(
       amount, IERC20(fromToken), IERC20(toToken), COLLECTOR, bytes32(0), _priceChecker, priceCheckerData
     );
@@ -465,20 +488,16 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
 
   /// @dev Internal function to decrease token budget
   function _decreaseBudget(address fromToken, uint256 amount) internal {
-    if (msg.sender != owner()) {
-      if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
-      tokenBudget[fromToken] -= amount;
+    if (amount > tokenBudget[fromToken]) revert InsufficientBudget();
+    tokenBudget[fromToken] -= amount;
 
-      emit UpdatedTokenBudget(fromToken, tokenBudget[fromToken]);
-    }
+    emit UpdatedTokenBudget(fromToken, tokenBudget[fromToken]);
   }
 
   /// @dev Internal function to increase token budget
   function _increaseBudget(address fromToken, uint256 amount) internal {
-    if (msg.sender != owner()) {
-      tokenBudget[fromToken] += amount;
+    tokenBudget[fromToken] += amount;
 
-      emit UpdatedTokenBudget(fromToken, tokenBudget[fromToken]);
-    }
+    emit UpdatedTokenBudget(fromToken, tokenBudget[fromToken]);
   }
 }
