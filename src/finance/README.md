@@ -184,9 +184,10 @@ This method cancels a pending TWAP swap. Portions that have already happened wil
 
 Get the expected amount of tokens when doing a swap. Informational only.
 
-`function emergencyTokenTransfer(address token, address recipient, uint256 amount) external onlyRescueGuardian`
+`function rescueToken(address token) external onlyOwnerOrGuardian`
+`function rescueToken(address token, uint256 amount) external onlyOwnerOrGuardian`
 
-Function for withdrawing tokens from `MainnetSwapSteward` to `Collector`.
+Functions for withdrawing tokens from `MainnetSwapSteward` to `Collector`. Overloaded function specifies amount. Regular function transfers balance of MainnetSwapSteward to Collector.
 
 ### Deployed Addresses
 
