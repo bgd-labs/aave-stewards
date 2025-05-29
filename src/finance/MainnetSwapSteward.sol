@@ -509,6 +509,8 @@ contract MainnetSwapSteward is
         uint256 amount,
         bytes memory priceCheckerData
     ) internal {
+        uint256 balanceBefore = IERC20(fromToken).balanceOf(address(this));
+
         IMilkman(tradeMilkman).cancelSwap(
             amount,
             IERC20(fromToken),
@@ -519,9 +521,17 @@ contract MainnetSwapSteward is
             priceCheckerData
         );
 
-        IERC20(fromToken).safeTransfer(COLLECTOR, amount);
+        uint256 balanceDiff = IERC20(fromToken).balanceOf(address(this)) -
+            balanceBefore;
 
-        emit SwapCanceled(fromToken, toToken, amount);
+        // Allow 2 wei deviation in case of rebasing tokens (ie: stETH)
+        if (balanceDiff < (amount - 2)) {
+            revert InvalidCancelAmount();
+        }
+
+        IERC20(fromToken).safeTransfer(COLLECTOR, balanceDiff);
+
+        emit SwapCanceled(fromToken, toToken, balanceDiff);
     }
 
     /// @notice Helper function to abi-encode data for price checker

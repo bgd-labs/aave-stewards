@@ -18,6 +18,9 @@ interface IMainnetSwapSteward {
         bytes32 appData;
     }
 
+    /// @dev The cancel amount is invalid
+    error InvalidCancelAmount();
+
     /// @dev Slippage is too high
     error InvalidSlippage();
 
