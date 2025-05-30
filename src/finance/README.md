@@ -189,6 +189,42 @@ Get the expected amount of tokens when doing a swap. Informational only.
 
 Functions for withdrawing tokens from `MainnetSwapSteward` to `Collector`. Overloaded function specifies amount. Regular function transfers balance of MainnetSwapSteward to Collector.
 
+`function increaseTokenBudget(address token, uint256 budget) external`
+
+Function for increasing the guardian's budget for a given token. Only callable by governance.
+
+`function decreaseTokenBudget(address token, uint256 budget) external`
+
+Function for decreasing the guardian's budget for a given token. Only callable by governance.
+
+`function setSwappablePair(address fromToken, address toToken, bool allowed) external`
+
+Function for setting a token pair combination to allowed/disallowed for swaps. Only callable by governance.
+
+`function setTokenOracle(address token, address oracle) external`
+
+Function for setting a token's oracle. Only callable by governance.
+
+`function setPriceChecker(address newPriceChecker) external`
+
+Function for setting the Price Checker smart contract to be used on regular swaps. Only callable by governance.
+
+`function setLimitOrderPriceChecker(address newPriceChecker) external`
+
+Function for setting the Price Checker smart contract to be used on limit order swaps. Only callable by governance.
+
+`function setMilkman(address newMilkman) external`
+
+Function for setting the Milkman (COW Swap) smart contract address. Only callable by governance.
+
+`function setRelayer(address newRelayer) external`
+
+Function for setting the Relayer (COW Swap) smart contract address. Only callable by governance.
+
+`function setRelayer(address newRelayer, address[] calldata tokens) external`
+
+Function for setting the Relayer (COW Swap) smart contract address. Allows passing an array of token addresses to set the allowance of the Relayer to zero for. Only callable by governance.
+
 ### Deployed Addresses
 
 Please check out https://github.com/charlesndalton/milkman for updates on addresses.
