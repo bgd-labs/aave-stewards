@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IAaveIncentivesController} from "./IAaveIncentivesController.sol";
 import {IRewardsController} from "aave-v3-origin/contracts/rewards/interfaces/IRewardsController.sol";
 
 /**
@@ -9,6 +10,9 @@ import {IRewardsController} from "aave-v3-origin/contracts/rewards/interfaces/IR
  * @notice Defines the behaviour of a GhoReserve
  */
 interface IRewardsSteward {
+  /// @dev Provided address cannot be the zero-address
+  error InvalidZeroAddress();
+
   /// @dev Emitted when a token reward is claimed for a given list of assets
   /// @param reward The token awarded
   /// @param amount The amount of token awarded
@@ -18,6 +22,11 @@ interface IRewardsSteward {
   /// @param rewards The list of tokens awarded
   /// @param amounts The amounts of tokens awarded
   event ClaimedRewards(address[] rewards, uint256[] amounts);
+
+  /// @dev Emitted when all rewards are claimed for a given list of assets
+  /// @param rewards The list of tokens awarded
+  /// @param amount The amount of tokens awarded
+  event ClaimedStkTokenRewards(address[] rewards, uint256 amount);
 
   /// @notice Claims all pending rewards on behalf of the Collector for a list of assets
   /// @param assets List of assets to claim rewards for
@@ -29,6 +38,11 @@ interface IRewardsSteward {
   /// @param reward The token awarded
   function claimRewards(address[] calldata assets, uint256 amount, address reward) external;
 
+  /// @notice Claims an amount of pending rewards from the AaveIncentivesController
+  /// @param assets List of assets to claim rewards for
+  /// @param amount The amount of rewards to claim
+  function claimStkTokenRewards(address[] calldata assets, uint256 amount) external;
+
   /// @notice Rescues the specified token back to the Collector
   /// @param token The address of the ERC20 token to rescue
   function rescueToken(address token) external;
@@ -38,6 +52,9 @@ interface IRewardsSteward {
 
   /// @notice Returns instance of Aave V3 Collector
   function COLLECTOR() external view returns (address);
+
+  /// @notice Returns instance of AaveIncentivesController
+  function INCENTIVES_CONTROLLER() external view returns (IAaveIncentivesController);
 
   /// @notice Returns instance of RewardsController
   function REWARDS_CONTROLLER() external view returns (IRewardsController);
