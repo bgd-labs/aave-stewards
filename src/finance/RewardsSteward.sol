@@ -6,6 +6,7 @@ import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.
 import {OwnableWithGuardian} from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
 import {Multicall} from "openzeppelin-contracts/contracts/utils/Multicall.sol";
+import {ChainIds} from "solidity-utils/contracts/utils/ChainHelpers.sol";
 import {IRewardsController} from "aave-v3-origin/contracts/rewards/interfaces/IRewardsController.sol";
 
 import {IAaveIncentivesController} from "./interfaces/IAaveIncentivesController.sol";
@@ -72,6 +73,8 @@ contract RewardsSteward is IRewardsSteward, OwnableWithGuardian, RescuableBase, 
 
   /// @inheritdoc IRewardsSteward
   function claimStkTokenRewards(address[] calldata assets, uint256 amount) external onlyOwnerOrGuardian {
+    if (block.chainid != ChainIds.MAINNET) revert OnlyMainnet();
+
     uint256 claimed = INCENTIVES_CONTROLLER.claimRewardsOnBehalf(assets, amount, COLLECTOR, COLLECTOR);
 
     emit ClaimedStkTokenRewards(assets, claimed);

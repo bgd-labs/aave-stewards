@@ -7,9 +7,11 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IWithGuardian} from "solidity-utils/contracts/access-control/interfaces/IWithGuardian.sol";
 import {IRescuable} from "solidity-utils/contracts/utils/Rescuable.sol";
 import {GovernanceV3Ethereum} from "aave-address-book/GovernanceV3Ethereum.sol";
+import {GovernanceV3Polygon} from "aave-address-book/GovernanceV3Polygon.sol";
 import {AaveV2Ethereum} from "aave-address-book/AaveV2Ethereum.sol";
 import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
 import {AaveV3EthereumLidoAssets} from "aave-address-book/AaveV3EthereumLido.sol";
+import {AaveV3Polygon, AaveV3PolygonAssets} from "aave-address-book/AaveV3Polygon.sol";
 import {IRewardsController} from "aave-v3-origin/contracts/rewards/interfaces/IRewardsController.sol";
 
 import {IAaveIncentivesController} from "src/finance/interfaces/IAaveIncentivesController.sol";
@@ -24,14 +26,28 @@ contract RewardsStewardTest is Test {
   event ClaimedRewards(address[] rewards, uint256[] amounts);
   event ClaimedStkTokenRewards(address[] rewards, uint256 amount);
 
+  // https://etherscan.io/address/0x4da27a545c0c5B758a6BA100e3a049001de870f5
   address public constant STK_AAVE = 0x4da27a545c0c5B758a6BA100e3a049001de870f5;
+  // https://etherscan.io/address/0xd784927Ff2f95ba542BfC824c8a8a98F3495f6b5
   address public constant AAVE_INCENTIVES_CONTROLLER = 0xd784927Ff2f95ba542BfC824c8a8a98F3495f6b5;
   address public guardian = makeAddr("guardian");
   address public alice = makeAddr("alice");
 
+  uint256 polygonFork;
+
   RewardsSteward public steward;
+  RewardsSteward public stewardPolygon;
 
   function setUp() public {
+    polygonFork = vm.createSelectFork(vm.rpcUrl("polygon"), 74532750);
+    stewardPolygon = new RewardsSteward(
+      GovernanceV3Polygon.EXECUTOR_LVL_1,
+      guardian,
+      address(AaveV3Polygon.COLLECTOR),
+      makeAddr("stk-aave"),
+      AaveV3Polygon.DEFAULT_INCENTIVES_CONTROLLER
+    );
+
     vm.createSelectFork(vm.rpcUrl("mainnet"), 23017400); // https://etherscan.io/block/23017400
 
     steward = new RewardsSteward(
@@ -186,6 +202,16 @@ contract ClaimStkTokenRewards is RewardsStewardTest {
     steward.claimStkTokenRewards(assets, 1 ether);
   }
 
+  function test_revertsIf_invalidChain() public {
+    vm.selectFork(polygonFork);
+    address[] memory assets = new address[](1);
+    assets[0] = AaveV3PolygonAssets.WETH_UNDERLYING;
+
+    vm.prank(GovernanceV3Polygon.EXECUTOR_LVL_1);
+    vm.expectRevert(IRewardsSteward.OnlyMainnet.selector);
+    stewardPolygon.claimStkTokenRewards(assets, 0);
+  }
+
   function test_successful_noRewards() public {
     address[] memory assets = new address[](1);
     assets[0] = AaveV3EthereumAssets.USDS_A_TOKEN;
@@ -196,14 +222,19 @@ contract ClaimStkTokenRewards is RewardsStewardTest {
     steward.claimStkTokenRewards(assets, 0);
   }
 
-  function test_successful() public {
-    address[] memory assets = new address[](1);
-    assets[0] = AaveV3EthereumAssets.USDS_A_TOKEN;
+  function test_successful_maxAmount() public {
+    address[] memory assets = new address[](0);
+
+    uint256 balanceBefore = IERC20(STK_AAVE).balanceOf(address(AaveV3Ethereum.COLLECTOR));
+    uint256 pendingRewards =
+      IAaveIncentivesController(AAVE_INCENTIVES_CONTROLLER).getRewardsBalance(assets, address(AaveV3Ethereum.COLLECTOR));
 
     vm.expectEmit(true, true, true, true, address(steward));
-    emit ClaimedStkTokenRewards(assets, 1 ether);
+    emit ClaimedStkTokenRewards(assets, pendingRewards);
     vm.prank(GovernanceV3Ethereum.EXECUTOR_LVL_1);
-    steward.claimStkTokenRewards(assets, 1 ether);
+    steward.claimStkTokenRewards(assets, type(uint256).max);
+
+    assertEq(IERC20(STK_AAVE).balanceOf(address(AaveV3Ethereum.COLLECTOR)), balanceBefore + pendingRewards);
   }
 }
 

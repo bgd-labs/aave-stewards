@@ -13,6 +13,9 @@ interface IRewardsSteward {
   /// @dev Provided address cannot be the zero-address
   error InvalidZeroAddress();
 
+  /// @dev Function can only be called on Ethereum Mainnet
+  error OnlyMainnet();
+
   /// @dev Emitted when a token reward is claimed for a given list of assets
   /// @param reward The token awarded
   /// @param amount The amount of token awarded

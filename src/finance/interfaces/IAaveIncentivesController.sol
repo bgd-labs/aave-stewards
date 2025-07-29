@@ -17,6 +17,13 @@ interface IAaveIncentivesController {
     returns (uint256);
 
   /**
+   * @dev Checks rewards balance for a given user
+   * @param assets The assets to claim rewards for
+   * @param user Address to check and claim rewards
+   */
+  function getRewardsBalance(address[] calldata assets, address user) external view returns (uint256);
+
+  /**
    * @dev Whitelists an address to claim the rewards on behalf of another address
    * @param user The address of the user
    * @param claimer The address of the claimer
