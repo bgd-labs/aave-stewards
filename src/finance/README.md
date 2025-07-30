@@ -10,7 +10,7 @@ MainnetSwapSteward facilitates swaps of tokens by the DAO without the constant n
 
 ## How It Works
 
-The MainnetSwapSteward relies on [Milkman](https://github.com/charlesndalton/milkman), a smart contract that builds on top of
+The MainnetSwapSteward relies on [Milkman](https://github.com/cowdao-grants/milkman), a smart contract that builds on top of
 [COW Swap](https://swap.cow.fi/#/faq/protocol), under the hood in order to find the best possible swap execution for
 the DAO while protecting funds from MEV exploits and bad slippage.
 
