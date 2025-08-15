@@ -109,6 +109,9 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
     POOL = IPool(pool);
     COLLECTOR = collector;
+    // @note Should pass an oracle from V3 version only! Because in the V2
+    // version the base currency - ETH, but in the V3 version it is the USD.
+    // This oracle is required to calculate the available budget.
     ORACLE = oracle;
 
     _setAvailableBudget(initialBudget);

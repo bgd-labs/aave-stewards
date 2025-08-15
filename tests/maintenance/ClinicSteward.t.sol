@@ -65,12 +65,7 @@ contract ClinicStewardBaseTest is Test {
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
     steward = new ClinicSteward(
-      address(AaveV3Avalanche.POOL),
-      address(AaveV3Avalanche.ORACLE),
-      collector,
-      admin,
-      guardian,
-      availableBudget
+      address(AaveV3Avalanche.POOL), address(AaveV3Avalanche.ORACLE), collector, admin, guardian, availableBudget
     );
 
     // v3.3 pool upgrade
