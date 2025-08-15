@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 
 import {IPool, DataTypes, IPoolAddressesProvider, IPriceOracleGetter} from "aave-address-book/AaveV3.sol";
 
+import {DataTypes as AaveV2DataTypes, ILendingPool} from "aave-address-book/AaveV2.sol";
+
 import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
 import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 
@@ -22,13 +24,13 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  * @title ClinicSteward
  * @author BGD Labs
  * @notice This contract helps with the liquidation or repayment of bad debt for
- * a list of users within the Aave V3 protocol.
+ * a list of users within the Aave V2 or V3 protocol.
  * All funds for those operations are pulled from the Aave Collector.
  *
  * Repayment of bad debt is permitted only for users without any collateral.
  * If a user has collateral, a liquidation should be performed instead.
  *
- * The contract inherits from `Multicall`. Using the `multicall` function from this contract\
+ * The contract inherits from `Multicall`. Using the `multicall` function from this contract
  * multiple liquidation or repayment operations could be bundled into a single transaction.
  *
  * -- Security Considerations --
@@ -84,19 +86,30 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
   /* CONSTRUCTOR */
 
-  /// @param pool The address of the Aave pool.
+  /// @param pool The address of the Aave Pool.
+  /// @param oracle The address of the Aave Oracle.
   /// @param collector The address of the Aave collector.
   /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
   /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
   /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
-  constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 initialBudget) {
-    if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
+  constructor(
+    address pool,
+    address oracle,
+    address collector,
+    address admin,
+    address cleanupRoleRecipient,
+    uint256 initialBudget
+  ) {
+    if (
+      pool == address(0) || oracle == address(0) || collector == address(0) || admin == address(0)
+        || cleanupRoleRecipient == address(0)
+    ) {
       revert ZeroAddress();
     }
 
     POOL = IPool(pool);
     COLLECTOR = collector;
-    ORACLE = IPoolAddressesProvider(IPool(pool).ADDRESSES_PROVIDER()).getPriceOracle();
+    ORACLE = oracle;
 
     _setAvailableBudget(initialBudget);
 
@@ -150,7 +163,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
       try POOL.liquidationCall({
         collateralAsset: collateralAsset,
         debtAsset: debtAsset,
-        user: users[i],
+        borrower: users[i],
         debtToCover: type(uint256).max,
         receiveAToken: true
       }) {} catch {
@@ -165,7 +178,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     _transferExcessToCollector(debtAsset);
 
     // transfer back liquidated assets
-    address collateralAToken = POOL.getReserveAToken(collateralAsset);
+    address collateralAToken = _getReserveAToken(collateralAsset);
     _transferExcessToCollector(collateralAToken);
   }
 
@@ -215,7 +228,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
   function _pullFunds(address asset, uint256 amount, bool useAToken) private {
     if (useAToken) {
-      address aToken = POOL.getReserveAToken(asset);
+      address aToken = _getReserveAToken(asset);
       // 1 wei surplus to account for rounding on multiple operations
       ICollector(COLLECTOR).transfer(IERC20(aToken), address(this), amount + 1);
       POOL.withdraw(asset, type(uint256).max, address(this));
@@ -268,7 +281,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     uint256 totalDebtAmount;
     uint256[] memory debtAmounts = new uint256[](users.length);
 
-    address variableDebtTokenAddress = POOL.getReserveVariableDebtToken(asset);
+    address variableDebtTokenAddress = _getReserveVariableDebtToken(asset);
 
     address user;
     for (uint256 i = 0; i < users.length; i++) {
@@ -286,5 +299,25 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     }
 
     return (totalDebtAmount, debtAmounts);
+  }
+
+  function _getReserveAToken(address asset) private view returns (address) {
+    try POOL.getReserveAToken(asset) returns (address aToken) {
+      return aToken;
+    } catch {
+      AaveV2DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
+
+      return reserveData.aTokenAddress;
+    }
+  }
+
+  function _getReserveVariableDebtToken(address asset) private view returns (address) {
+    try POOL.getReserveVariableDebtToken(asset) returns (address variableDebtToken) {
+      return variableDebtToken;
+    } catch {
+      AaveV2DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
+
+      return reserveData.variableDebtTokenAddress;
+    }
   }
 }

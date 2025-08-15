@@ -5,8 +5,9 @@ import {Test} from "forge-std/Test.sol";
 
 import {GovV3Helpers} from "aave-helpers/src/GovV3Helpers.sol";
 
-import {IPool, IAToken, DataTypes} from "aave-address-book/AaveV3.sol";
-import {AaveV3Avalanche, AaveV3AvalancheAssets} from "aave-address-book/AaveV3Avalanche.sol";
+import {ILendingPool, DataTypes} from "aave-address-book/AaveV2.sol";
+import {AaveV3Ethereum, IAaveOracle} from "aave-address-book/AaveV3Ethereum.sol";
+import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -15,79 +16,107 @@ import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessCon
 import {IClinicSteward} from "../../src/maintenance/interfaces/IClinicSteward.sol";
 import {ClinicSteward} from "../../src/maintenance/ClinicSteward.sol";
 
-contract ClinicStewardBaseTest is Test {
+contract ClinicStewardV2PoolBaseTest is Test {
   ClinicSteward public steward;
 
-  address public assetUnderlying = AaveV3AvalancheAssets.BTCb_UNDERLYING;
-  address public assetAToken = AaveV3AvalancheAssets.BTCb_A_TOKEN;
-  address public assetDebtToken = AaveV3AvalancheAssets.BTCb_V_TOKEN;
+  address public assetUnderlying = AaveV2EthereumAssets.WETH_UNDERLYING;
+  address public assetAToken = AaveV2EthereumAssets.WETH_A_TOKEN;
+  address public assetDebtToken = AaveV2EthereumAssets.WETH_V_TOKEN;
 
   address[] public usersWithBadDebt = [
-    0x233bA87Cb5180fcCf86ac8Dd19CE07d09732DD39,
-    0x20Bb103F0688D434d80336010b7F5feA22B8480E,
-    0x9D4Ad74b46675998321101b2a49a4D66ac7509Ea,
-    0xCb87dD67Fe09121abd335044a1e0d6bf44C915FB,
-    0xd3D97E2cbF1fc09528830F58BCA6DbC4cc74bA14,
-    0xd80aC14a778f4A708dcda53D9B03e1A66B551872
+    0xFa4FC4ec2F81A4897743C5b4f45907c02ce06199,
+    0xb5fb748EC3e019A7Ed4F6F701158bc23FA3a2626,
+    0x6Aa63cb1657A2d9Dd8D0F54232ffda85267Af210,
+    0xE801740F53040CF26E2F35811FB0c73D2B866902,
+    0xD98014Be6E16eCDCd52a5fd8D6AC0c2f4CC8B95D
   ];
   uint256 totalBadDebt;
   uint256[] public usersBadDebtAmounts;
 
   address[] public usersEligibleForLiquidations = [
-    0x6821Aceb02Bd2a64d0900cBf193A543aB41d397e,
-    0x5822fb7f7eC70258abe638a6E8637FEd206311F7,
-    0x35cBb2525e442488Ed51cE524b4000D4d0d01acC,
-    0xE32655B320e77a7103e0837282106677F2C28dCb,
-    0x042F53D7250c49f9DCCc54b1A1CFafB16d8A0633,
-    0x4dAad5b1B9A4c60F1Bd18A0890AF6794A2242a7E
+    0x20043D364e650318c129108B3dB625A1069778d5,
+    0x52DE8B421f596edAF028b1FfCB92EC61CB9622A4,
+    0x8F6D072cA42432692de973b788e89794D7db1037,
+    0xd962D5147f628f3f902cB06696D2aa6E72411262,
+    0xa6bF7fCebc4B4148c0c54324b190AaA7A779362e
   ];
-  address collateralEligibleForLiquidations = AaveV3AvalancheAssets.USDC_UNDERLYING;
+  address collateralEligibleForLiquidations = AaveV2EthereumAssets.USDC_UNDERLYING;
   uint256[] public usersEligibleForLiquidationsDebtAmounts;
   uint256 public totalDebtToLiquidate;
 
   address[] public usersWithGoodDebt = [
-    0x37592B2927c40C4B0054614D7FF6065D6B752a8C,
-    0x5fb6Fd8125023c7c4f8FFC8b636a658ad8C1b4eF,
-    0x20ed4EF75cE723A580D250005a00DfC86F03112a,
-    0x1C943ffC835bFcCd2a435e7bE3507eF821aC06e2,
-    0x87F8A29eB20D5DB98dE07301345b48E1e9DDa569,
-    0x97F0d7f9d9e7Fe4BFBAbc04BE336dc058873A0E8
+    0xc70f915258483D65C3C562483653397D6B371858,
+    0x5Ea145d91058F8B9fD6B02d30DB9959EB4C0af2C,
+    0x7C07F7aBe10CE8e33DC6C5aD68FE033085256A84,
+    0xf48Fe3471334E87D9B93a1559A049d1D1994B3a1,
+    0x52ee6E1Af57889a513bf65AD7010ED36DA7FAAE3
   ];
 
   address public guardian = address(0x101);
 
   address public admin = address(0x102);
 
-  address public collector = address(AaveV3Avalanche.COLLECTOR);
+  address public collector = address(AaveV2Ethereum.COLLECTOR);
 
   uint256 public availableBudget = 1_000_000e8;
 
-  function setUp() public {
-    vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
-    steward = new ClinicSteward(
-      address(AaveV3Avalanche.POOL),
-      address(AaveV3Avalanche.ORACLE),
-      collector,
-      admin,
-      guardian,
-      availableBudget
-    );
+  ILendingPool public pool = AaveV2Ethereum.POOL;
+  IAaveOracle public oracle = AaveV3Ethereum.ORACLE;
 
-    // v3.3 pool upgrade
-    GovV3Helpers.executePayload(vm, 67);
-    vm.prank(AaveV3Avalanche.ACL_ADMIN);
+  function setUp() public {
+    vm.createSelectFork(vm.rpcUrl("mainnet"), 23138376);
+
+    steward =
+      new ClinicSteward(address(AaveV2Ethereum.POOL), address(oracle), collector, admin, guardian, availableBudget);
+
+    vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
 
     vm.prank(collector);
     IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
 
-    vm.label(address(AaveV3Avalanche.POOL), "Pool");
+    vm.label(address(pool), "Pool");
     vm.label(address(steward), "ClinicSteward");
     vm.label(guardian, "Guardian");
     vm.label(admin, "Admin");
     vm.label(collector, "Collector");
     vm.label(assetUnderlying, "AssetUnderlying");
     vm.label(assetDebtToken, "AssetDebtToken");
+
+    // make all possible liquidations for users from `usersWithBadDebt` list
+    address[] memory reserves = pool.getReservesList();
+    for (uint256 i = 0; i < usersWithBadDebt.length; ++i) {
+      for (uint256 j = 0; j < reserves.length; ++j) {
+        address vToken = _getReserveVariableDebtToken(reserves[j]);
+
+        uint256 debtAmount = IERC20(vToken).balanceOf(usersWithBadDebt[i]);
+        if (debtAmount > 0) {
+          for (uint256 k = 0; k < reserves.length; ++k) {
+            address aToken = _getReserveAToken(reserves[k]);
+
+            uint256 supplyAmount = IERC20(aToken).balanceOf(usersWithBadDebt[i]);
+            if (supplyAmount > 0) {
+              deal(reserves[j], address(this), debtAmount * 2);
+
+              IERC20(reserves[j]).approve(address(pool), debtAmount * 2);
+
+              pool.liquidationCall({
+                collateralAsset: reserves[k],
+                debtAsset: reserves[j],
+                user: usersWithBadDebt[i],
+                debtToCover: type(uint256).max,
+                receiveAToken: false
+              });
+            }
+
+            debtAmount = IERC20(vToken).balanceOf(usersWithBadDebt[i]);
+            if (debtAmount == 0) {
+              break;
+            }
+          }
+        }
+      }
+    }
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersWithBadDebt[i]);
@@ -98,8 +127,7 @@ contract ClinicStewardBaseTest is Test {
       usersBadDebtAmounts.push(currentDebtAmount);
     }
 
-    DataTypes.ReserveDataLegacy memory collateralReserveData =
-      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
+    address collateralEligibleForLiquidationsAToken = _getReserveAToken(collateralEligibleForLiquidations);
     for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
       uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
 
@@ -108,14 +136,27 @@ contract ClinicStewardBaseTest is Test {
       totalDebtToLiquidate += currentDebtAmount;
       usersEligibleForLiquidationsDebtAmounts.push(currentDebtAmount);
 
-      uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
+      uint256 collateralBalance =
+        IERC20(collateralEligibleForLiquidationsAToken).balanceOf(usersEligibleForLiquidations[i]);
 
       assertNotEq(collateralBalance, 0);
     }
   }
+
+  function _getReserveAToken(address asset) internal view returns (address) {
+    DataTypes.ReserveData memory reserveData = pool.getReserveData(asset);
+
+    return reserveData.aTokenAddress;
+  }
+
+  function _getReserveVariableDebtToken(address asset) internal view returns (address) {
+    DataTypes.ReserveData memory reserveData = pool.getReserveData(asset);
+
+    return reserveData.variableDebtTokenAddress;
+  }
 }
 
-contract ClinicStewardTest is ClinicStewardBaseTest {
+contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
   function test_batchRepayBadDebt() public {
     deal(assetUnderlying, collector, totalBadDebt);
 
@@ -128,8 +169,8 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     assertEq(collectorBalanceBefore - collectorBalanceAfter, totalBadDebt);
 
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
-      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount =
+      (oracle.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
@@ -138,7 +179,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
   }
 
   function test_batchRepayBadDebtUseAToken() public {
-    address aToken = AaveV3Avalanche.POOL.getReserveAToken(assetUnderlying);
+    address aToken = _getReserveAToken(assetUnderlying);
     uint256 collectorUnderlyingBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
     uint256 collectorBalanceBefore = IERC20(aToken).balanceOf(collector);
 
@@ -155,8 +196,8 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
       100
     );
 
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
-      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount =
+      (oracle.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
@@ -178,16 +219,14 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
   }
 
   function test_reverts_batchRepayBadDebt_exceeded_pull_limit() public {
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
-      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount =
+      (oracle.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(
-      address(AaveV3Avalanche.POOL), address(AaveV3Avalanche.ORACLE), collector, admin, guardian, newAvailableBudget
-    );
+    steward = new ClinicSteward(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
 
-    vm.prank(AaveV3Avalanche.ACL_ADMIN);
+    vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
 
     vm.prank(collector);
@@ -211,10 +250,9 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     uint256 collectorBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    DataTypes.ReserveDataLegacy memory collateralReserveData =
-      AaveV3Avalanche.POOL.getReserveData(collateralEligibleForLiquidations);
-    uint256 collectorCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
-    uint256 stewardCollateralBalanceBefore = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
+    address collateralReserveDataAToken = _getReserveAToken(collateralEligibleForLiquidations);
+    uint256 collectorCollateralBalanceBefore = IERC20(collateralReserveDataAToken).balanceOf(collector);
+    uint256 stewardCollateralBalanceBefore = IERC20(collateralReserveDataAToken).balanceOf(address(steward));
 
     vm.prank(guardian);
     steward.batchLiquidate(assetUnderlying, collateralEligibleForLiquidations, usersEligibleForLiquidations, false);
@@ -222,37 +260,29 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     uint256 collectorBalanceAfter = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceAfter = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    uint256 collectorCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(collector);
-    uint256 stewardCollateralBalanceAfter = IERC20(collateralReserveData.aTokenAddress).balanceOf(address(steward));
+    uint256 collectorCollateralBalanceAfter = IERC20(collateralReserveDataAToken).balanceOf(collector);
+    uint256 stewardCollateralBalanceAfter = IERC20(collateralReserveDataAToken).balanceOf(address(steward));
 
     assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
     assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
 
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate)
-      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount =
+      (oracle.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
 
     assertEq(stewardBalanceBefore, stewardBalanceAfter);
     assertEq(stewardCollateralBalanceBefore, stewardCollateralBalanceAfter);
-
-    for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
-      uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
-
-      uint256 collateralBalance = IERC20(collateralReserveData.aTokenAddress).balanceOf(usersEligibleForLiquidations[i]);
-
-      assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
-    }
   }
 
   function test_batchLiquidateUseAToken() public {
-    address debtAToken = AaveV3Avalanche.POOL.getReserveAToken(assetUnderlying);
+    address debtAToken = _getReserveAToken(assetUnderlying);
     uint256 collectorBalanceBefore = IERC20(debtAToken).balanceOf(collector);
     uint256 collectorDebtUnderlyingBalanceBefore = IERC20(assetUnderlying).balanceOf(collector);
     uint256 stewardBalanceBefore = IERC20(assetUnderlying).balanceOf(address(steward));
 
-    address collateralAToken = AaveV3Avalanche.POOL.getReserveAToken(collateralEligibleForLiquidations);
+    address collateralAToken = _getReserveAToken(collateralEligibleForLiquidations);
     uint256 collectorCollateralBalanceBefore = IERC20(collateralAToken).balanceOf(collector);
     uint256 stewardCollateralBalanceBefore = IERC20(collateralAToken).balanceOf(address(steward));
 
@@ -270,7 +300,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
     assertGe(collectorDebtUnderlyingBalanceAfter, collectorDebtUnderlyingBalanceBefore);
     assertLe(collectorBalanceBefore - collectorBalanceAfter, totalDebtToLiquidate + 1); // account for 1 wei rounding surplus
 
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * (totalDebtToLiquidate))
+    uint256 debtDollarAmount = (oracle.getAssetPrice(assetUnderlying) * (totalDebtToLiquidate))
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertApproxEqAbs(steward.availableBudget(), availableBudget - debtDollarAmount, 1);
 
@@ -278,14 +308,6 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     assertEq(stewardBalanceBefore, stewardBalanceAfter);
     assertEq(stewardCollateralBalanceBefore, stewardCollateralBalanceAfter);
-
-    for (uint256 i = 0; i < usersEligibleForLiquidations.length; i++) {
-      uint256 currentDebtAmount = IERC20(assetDebtToken).balanceOf(usersEligibleForLiquidations[i]);
-
-      uint256 collateralBalance = IERC20(collateralAToken).balanceOf(usersEligibleForLiquidations[i]);
-
-      assertTrue(currentDebtAmount == 0 || collateralBalance == 0);
-    }
   }
 
   function test_reverts_batchLiquidate_caller_not_cleaner(address caller) public {
@@ -302,16 +324,14 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
   }
 
   function test_reverts_batchLiquidate_exceeded_pull_limit() public {
-    uint256 debtDollarAmount = (AaveV3Avalanche.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate)
-      / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount =
+      (oracle.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(
-      address(AaveV3Avalanche.POOL), address(AaveV3Avalanche.ORACLE), collector, admin, guardian, newAvailableBudget
-    );
+    steward = new ClinicSteward(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
 
-    vm.prank(AaveV3Avalanche.ACL_ADMIN);
+    vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
 
     vm.prank(collector);
