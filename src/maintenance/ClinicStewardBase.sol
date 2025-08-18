@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPool, DataTypes, IPoolAddressesProvider, IPriceOracleGetter} from "aave-address-book/AaveV3.sol";
-
-import {DataTypes as AaveV2DataTypes, ILendingPool} from "aave-address-book/AaveV2.sol";
+import {IPool, DataTypes, IPoolAddressesProvider} from "aave-address-book/AaveV3.sol";
 
 import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
 import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
@@ -63,7 +61,7 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  * The available budget is tracked in $ with 8 decimal precision.
  * When liquidating or repaying assets worth less than 1 unit, it will not be discounted from the budget.
  */
-contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessControl {
+abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
   using UserConfiguration for DataTypes.UserConfigurationMap;
 
@@ -241,7 +239,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   }
 
   function _decreaseAvailableBudget(address asset, uint256 amount) private {
-    uint256 assetPrice = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
+    uint256 assetPrice = _getOraclePrice(asset);
 
     uint256 dollarAmount = (amount * assetPrice) / (10 ** IERC20Metadata(asset).decimals());
 
@@ -304,23 +302,9 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     return (totalDebtAmount, debtAmounts);
   }
 
-  function _getReserveAToken(address asset) private view returns (address) {
-    try POOL.getReserveAToken(asset) returns (address aToken) {
-      return aToken;
-    } catch {
-      AaveV2DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
+  function _getReserveAToken(address asset) internal view virtual returns (address);
 
-      return reserveData.aTokenAddress;
-    }
-  }
+  function _getReserveVariableDebtToken(address asset) internal view virtual returns (address);
 
-  function _getReserveVariableDebtToken(address asset) private view returns (address) {
-    try POOL.getReserveVariableDebtToken(asset) returns (address variableDebtToken) {
-      return variableDebtToken;
-    } catch {
-      AaveV2DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
-
-      return reserveData.variableDebtTokenAddress;
-    }
-  }
+  function _getOraclePrice(address asset) internal view virtual returns (uint256);
 }

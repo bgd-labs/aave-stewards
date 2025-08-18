@@ -13,10 +13,10 @@ import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/exten
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 import {IClinicSteward} from "../../src/maintenance/interfaces/IClinicSteward.sol";
-import {ClinicSteward} from "../../src/maintenance/ClinicSteward.sol";
+import {ClinicStewardV3} from "../../src/maintenance/ClinicStewardV3.sol";
 
-contract ClinicStewardBaseTest is Test {
-  ClinicSteward public steward;
+contract ClinicStewardV3BaseTest is Test {
+  ClinicStewardV3 public steward;
 
   address public assetUnderlying = AaveV3AvalancheAssets.BTCb_UNDERLYING;
   address public assetAToken = AaveV3AvalancheAssets.BTCb_A_TOKEN;
@@ -64,7 +64,7 @@ contract ClinicStewardBaseTest is Test {
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
-    steward = new ClinicSteward(
+    steward = new ClinicStewardV3(
       address(AaveV3Avalanche.POOL), address(AaveV3Avalanche.ORACLE), collector, admin, guardian, availableBudget
     );
 
@@ -77,7 +77,7 @@ contract ClinicStewardBaseTest is Test {
     IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
 
     vm.label(address(AaveV3Avalanche.POOL), "Pool");
-    vm.label(address(steward), "ClinicSteward");
+    vm.label(address(steward), "ClinicStewardV3");
     vm.label(guardian, "Guardian");
     vm.label(admin, "Admin");
     vm.label(collector, "Collector");
@@ -110,7 +110,7 @@ contract ClinicStewardBaseTest is Test {
   }
 }
 
-contract ClinicStewardTest is ClinicStewardBaseTest {
+contract ClinicStewardV3Test is ClinicStewardV3BaseTest {
   function test_batchRepayBadDebt() public {
     deal(assetUnderlying, collector, totalBadDebt);
 
@@ -178,7 +178,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(
+    steward = new ClinicStewardV3(
       address(AaveV3Avalanche.POOL), address(AaveV3Avalanche.ORACLE), collector, admin, guardian, newAvailableBudget
     );
 
@@ -302,7 +302,7 @@ contract ClinicStewardTest is ClinicStewardBaseTest {
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(
+    steward = new ClinicStewardV3(
       address(AaveV3Avalanche.POOL), address(AaveV3Avalanche.ORACLE), collector, admin, guardian, newAvailableBudget
     );
 

@@ -6,18 +6,18 @@ import {Test} from "forge-std/Test.sol";
 import {GovV3Helpers} from "aave-helpers/src/GovV3Helpers.sol";
 
 import {ILendingPool, DataTypes} from "aave-address-book/AaveV2.sol";
-import {AaveV3Ethereum, IAaveOracle} from "aave-address-book/AaveV3Ethereum.sol";
-import {AaveV2Ethereum, AaveV2EthereumAssets} from "aave-address-book/AaveV2Ethereum.sol";
+import {AaveV3Ethereum} from "aave-address-book/AaveV3Ethereum.sol";
+import {AaveV2Ethereum, AaveV2EthereumAssets, IAaveOracle} from "aave-address-book/AaveV2Ethereum.sol";
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 import {IClinicSteward} from "../../src/maintenance/interfaces/IClinicSteward.sol";
-import {ClinicSteward} from "../../src/maintenance/ClinicSteward.sol";
+import {ClinicStewardV2} from "../../src/maintenance/ClinicStewardV2.sol";
 
-contract ClinicStewardV2PoolBaseTest is Test {
-  ClinicSteward public steward;
+contract ClinicStewardV2BaseTest is Test {
+  ClinicStewardV2 public steward;
 
   address public assetUnderlying = AaveV2EthereumAssets.WETH_UNDERLYING;
   address public assetAToken = AaveV2EthereumAssets.WETH_A_TOKEN;
@@ -61,13 +61,13 @@ contract ClinicStewardV2PoolBaseTest is Test {
   uint256 public availableBudget = 1_000_000e8;
 
   ILendingPool public pool = AaveV2Ethereum.POOL;
-  IAaveOracle public oracle = AaveV3Ethereum.ORACLE;
+  IAaveOracle public oracle = AaveV2Ethereum.ORACLE;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("mainnet"), 23138376);
 
     steward =
-      new ClinicSteward(address(AaveV2Ethereum.POOL), address(oracle), collector, admin, guardian, availableBudget);
+      new ClinicStewardV2(address(AaveV2Ethereum.POOL), address(oracle), collector, admin, guardian, availableBudget);
 
     vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
@@ -76,7 +76,7 @@ contract ClinicStewardV2PoolBaseTest is Test {
     IERC20(assetUnderlying).approve(address(steward), 100_000_000e18);
 
     vm.label(address(pool), "Pool");
-    vm.label(address(steward), "ClinicSteward");
+    vm.label(address(steward), "ClinicStewardV2");
     vm.label(guardian, "Guardian");
     vm.label(admin, "Admin");
     vm.label(collector, "Collector");
@@ -156,7 +156,7 @@ contract ClinicStewardV2PoolBaseTest is Test {
   }
 }
 
-contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
+contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
   function test_batchRepayBadDebt() public {
     deal(assetUnderlying, collector, totalBadDebt);
 
@@ -170,7 +170,7 @@ contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
     assertEq(collectorBalanceBefore - collectorBalanceAfter, totalBadDebt);
 
     uint256 debtDollarAmount =
-      (oracle.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
@@ -197,7 +197,7 @@ contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
     );
 
     uint256 debtDollarAmount =
-      (oracle.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
@@ -220,11 +220,11 @@ contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
 
   function test_reverts_batchRepayBadDebt_exceeded_pull_limit() public {
     uint256 debtDollarAmount =
-      (oracle.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
+    steward = new ClinicStewardV2(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
 
     vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
@@ -267,7 +267,7 @@ contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
     assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
 
     uint256 debtDollarAmount =
-      (oracle.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
@@ -300,7 +300,7 @@ contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
     assertGe(collectorDebtUnderlyingBalanceAfter, collectorDebtUnderlyingBalanceBefore);
     assertLe(collectorBalanceBefore - collectorBalanceAfter, totalDebtToLiquidate + 1); // account for 1 wei rounding surplus
 
-    uint256 debtDollarAmount = (oracle.getAssetPrice(assetUnderlying) * (totalDebtToLiquidate))
+    uint256 debtDollarAmount = (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * (totalDebtToLiquidate))
       / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertApproxEqAbs(steward.availableBudget(), availableBudget - debtDollarAmount, 1);
 
@@ -325,11 +325,11 @@ contract ClinicStewardV2PoolTest is ClinicStewardV2PoolBaseTest {
 
   function test_reverts_batchLiquidate_exceeded_pull_limit() public {
     uint256 debtDollarAmount =
-      (oracle.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicSteward(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
+    steward = new ClinicStewardV2(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
 
     vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
