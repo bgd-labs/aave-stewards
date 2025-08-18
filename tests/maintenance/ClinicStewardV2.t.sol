@@ -169,8 +169,8 @@ contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
 
     assertEq(collectorBalanceBefore - collectorBalanceAfter, totalBadDebt);
 
-    uint256 debtDollarAmount =
-      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount = (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
@@ -196,8 +196,8 @@ contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
       100
     );
 
-    uint256 debtDollarAmount =
-      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount = (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     for (uint256 i = 0; i < usersWithBadDebt.length; i++) {
@@ -219,8 +219,8 @@ contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
   }
 
   function test_reverts_batchRepayBadDebt_exceeded_pull_limit() public {
-    uint256 debtDollarAmount =
-      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount = (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalBadDebt)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
@@ -266,8 +266,8 @@ contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
     assertTrue(collectorBalanceBefore >= collectorBalanceAfter);
     assertTrue(collectorBalanceBefore - collectorBalanceAfter <= totalDebtToLiquidate);
 
-    uint256 debtDollarAmount =
-      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount = (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
     assertEq(steward.availableBudget(), availableBudget - debtDollarAmount);
 
     assertTrue(collectorCollateralBalanceAfter >= collectorCollateralBalanceBefore);
@@ -324,8 +324,8 @@ contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
   }
 
   function test_reverts_batchLiquidate_exceeded_pull_limit() public {
-    uint256 debtDollarAmount =
-      (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate) / 10 ** IERC20Metadata(assetUnderlying).decimals();
+    uint256 debtDollarAmount = (AaveV3Ethereum.ORACLE.getAssetPrice(assetUnderlying) * totalDebtToLiquidate)
+      / 10 ** IERC20Metadata(assetUnderlying).decimals();
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
