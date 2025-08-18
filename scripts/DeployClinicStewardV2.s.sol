@@ -14,7 +14,7 @@ import {AaveV2Avalanche} from "aave-address-book/AaveV2Avalanche.sol";
 import {GovernanceV3Avalanche} from "aave-address-book/GovernanceV3Avalanche.sol";
 
 import {AaveV2Ethereum} from "aave-address-book/AaveV2Ethereum.sol";
-import {AaveV2EthereumAMM} from "aave-address-book/AaveV2EthereumAmm.sol";
+import {AaveV2EthereumAMM} from "aave-address-book/AaveV2EthereumAMM.sol";
 import {GovernanceV3Ethereum} from "aave-address-book/GovernanceV3Ethereum.sol";
 
 address constant MULTISIG = 0xdeadD8aB03075b7FBA81864202a2f59EE25B312b;
