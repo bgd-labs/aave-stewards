@@ -19,7 +19,9 @@ contract ClinicStewardV2 is ClinicStewardBase {
   /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
   constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 initialBudget)
     ClinicStewardBase(pool, collector, admin, cleanupRoleRecipient, initialBudget)
-  {}
+  {
+    ORACLE = ILendingPool(pool).getAddressesProvider().getPriceOracle();
+  }
 
   function _getReserveAToken(address asset) internal view override returns (address) {
     DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
@@ -34,10 +36,7 @@ contract ClinicStewardV2 is ClinicStewardBase {
   }
 
   function _getOraclePrice(address asset) internal view override returns (uint256) {
-    ILendingPool pool = ILendingPool(address(POOL));
-    IPriceOracleGetter priceOracle = IPriceOracleGetter(pool.getAddressesProvider().getPriceOracle());
-
-    uint256 priceFromOracle = priceOracle.getAssetPrice(asset);
+    uint256 priceFromOracle = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
 
     if (block.chainid == 1 || block.chainid == 137) {
       // @note In Aave V2 Polygon, Ethereum Core and AMM an oracle has ETH as a base currency

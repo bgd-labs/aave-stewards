@@ -38,6 +38,9 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @notice The Aave collector
   function COLLECTOR() external view returns (address);
 
+  /// @notice The Aave oracle
+  function ORACLE() external view returns (address);
+
   /// @notice The available budget for the contract, in dollar value (8 decimals).
   function availableBudget() external view returns (uint256);
 

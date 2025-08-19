@@ -77,6 +77,9 @@ abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall,
   address public immutable override COLLECTOR;
 
   /// @inheritdoc IClinicSteward
+  address public immutable override ORACLE;
+
+  /// @inheritdoc IClinicSteward
   uint256 public override availableBudget;
 
   /* CONSTRUCTOR */
