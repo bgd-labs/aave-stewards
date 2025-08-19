@@ -2,12 +2,14 @@
 pragma solidity ^0.8.0;
 
 import {IPriceOracleGetter} from "aave-address-book/AaveV3.sol";
-
-import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethereum.sol";
-import {AaveV3Polygon, AaveV3PolygonAssets} from "aave-address-book/AaveV3Polygon.sol";
 import {DataTypes, ILendingPool} from "aave-address-book/AaveV2.sol";
 
+import {ChainlinkEthereum} from "aave-address-book/ChainlinkEthereum.sol";
+import {ChainlinkPolygon} from "aave-address-book/ChainlinkPolygon.sol";
+
 import {ClinicStewardBase} from "./ClinicStewardBase.sol";
+
+import {AggregatorInterface} from "./interfaces/AggregatorInterface.sol";
 
 contract ClinicStewardV2 is ClinicStewardBase {
   /// @param pool The address of the Aave Pool.
@@ -43,11 +45,11 @@ contract ClinicStewardV2 is ClinicStewardBase {
       uint256 ethPrice = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
 
       if (block.chainid == 1) {
-        return ethPrice * IPriceOracleGetter(AaveV3Ethereum.ORACLE).getAssetPrice(AaveV3EthereumAssets.WETH_UNDERLYING)
-          / 1e18;
+        // `ChainlinkEthereum.ETH_USD` has 8 decimals
+        return ethPrice * uint256(AggregatorInterface(ChainlinkEthereum.ETH_USD).latestAnswer()) / 1e18;
       } else {
-        return
-          ethPrice * IPriceOracleGetter(AaveV3Polygon.ORACLE).getAssetPrice(AaveV3PolygonAssets.WETH_UNDERLYING) / 1e18;
+        // `ChainlinkPolygon.ETH_USD` has 8 decimals
+        return ethPrice * uint256(AggregatorInterface(ChainlinkPolygon.ETH_USD).latestAnswer()) / 1e18;
       }
     } else {
       return IPriceOracleGetter(ORACLE).getAssetPrice(asset);
