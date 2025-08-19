@@ -13,19 +13,17 @@ import {AggregatorInterface} from "./interfaces/AggregatorInterface.sol";
 
 contract ClinicStewardV2 is ClinicStewardBase {
   /// @param pool The address of the Aave Pool.
-  /// @param oracle The address of the Aave Oracle.
   /// @param collector The address of the Aave collector.
   /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
   /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
   /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
   constructor(
     address pool,
-    address oracle,
     address collector,
     address admin,
     address cleanupRoleRecipient,
     uint256 initialBudget
-  ) ClinicStewardBase(pool, oracle, collector, admin, cleanupRoleRecipient, initialBudget) {}
+  ) ClinicStewardBase(pool, collector, admin, cleanupRoleRecipient, initialBudget) {}
 
   function _getReserveAToken(address asset) internal view override returns (address) {
     DataTypes.ReserveData memory reserveData = ILendingPool(address(POOL)).getReserveData(asset);
@@ -40,19 +38,22 @@ contract ClinicStewardV2 is ClinicStewardBase {
   }
 
   function _getOraclePrice(address asset) internal view override returns (uint256) {
+    ILendingPool pool = ILendingPool(address(POOL));
+    IPriceOracleGetter priceOracle = IPriceOracleGetter(pool.getAddressesProvider().getPriceOracle());
+
+    uint256 priceFromOracle = priceOracle.getAssetPrice(asset);
+
     if (block.chainid == 1 || block.chainid == 137) {
       // @note In Aave V2 Polygon, Ethereum Core and AMM an oracle has ETH as a base currency
-      uint256 ethPrice = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
-
       if (block.chainid == 1) {
         // `ChainlinkEthereum.ETH_USD` has 8 decimals
-        return ethPrice * uint256(AggregatorInterface(ChainlinkEthereum.ETH_USD).latestAnswer()) / 1e18;
+        return priceFromOracle * uint256(AggregatorInterface(ChainlinkEthereum.ETH_USD).latestAnswer()) / 1e18;
       } else {
         // `ChainlinkPolygon.ETH_USD` has 8 decimals
-        return ethPrice * uint256(AggregatorInterface(ChainlinkPolygon.ETH_USD).latestAnswer()) / 1e18;
+        return priceFromOracle * uint256(AggregatorInterface(ChainlinkPolygon.ETH_USD).latestAnswer()) / 1e18;
       }
     } else {
-      return IPriceOracleGetter(ORACLE).getAssetPrice(asset);
+      return priceFromOracle;
     }
   }
 }

@@ -7,19 +7,17 @@ import {ClinicStewardBase} from "./ClinicStewardBase.sol";
 
 contract ClinicStewardV3 is ClinicStewardBase {
   /// @param pool The address of the Aave Pool.
-  /// @param oracle The address of the Aave Oracle.
   /// @param collector The address of the Aave collector.
   /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
   /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
   /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
   constructor(
     address pool,
-    address oracle,
     address collector,
     address admin,
     address cleanupRoleRecipient,
     uint256 initialBudget
-  ) ClinicStewardBase(pool, oracle, collector, admin, cleanupRoleRecipient, initialBudget) {}
+  ) ClinicStewardBase(pool, collector, admin, cleanupRoleRecipient, initialBudget) {}
 
   function _getReserveAToken(address asset) internal view override returns (address) {
     return POOL.getReserveAToken(asset);
@@ -30,6 +28,8 @@ contract ClinicStewardV3 is ClinicStewardBase {
   }
 
   function _getOraclePrice(address asset) internal view override returns (uint256) {
-    return IPriceOracleGetter(ORACLE).getAssetPrice(asset);
+    IPriceOracleGetter priceOracle = IPriceOracleGetter(POOL.ADDRESSES_PROVIDER().getPriceOracle());
+
+    return priceOracle.getAssetPrice(asset);
   }
 }

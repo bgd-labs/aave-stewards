@@ -51,16 +51,16 @@ address constant MULTISIG = 0xdeadD8aB03075b7FBA81864202a2f59EE25B312b;
 address constant MULTISIG_ZK = 0x77CC0A0582475bfD74CD838610e817d05c181E11;
 
 library DeploymentLibrary {
-  function _deploy(IPool pool, IAaveOracle oracle, ICollector collector, address admin, uint256 budget) internal {
+  function _deploy(IPool pool, ICollector collector, address admin, uint256 budget) internal {
     Create2Utils.create2Deploy(
       "v1",
       type(ClinicStewardV3).creationCode,
-      abi.encode(address(pool), oracle, address(collector), admin, MULTISIG, budget)
+      abi.encode(address(pool), address(collector), admin, MULTISIG, budget)
     );
   }
 
-  function _deployZk(IPool pool, IAaveOracle oracle, ICollector collector, address admin, uint256 budget) internal {
-    new ClinicStewardV3{salt: "v1"}(address(pool), address(oracle), address(collector), admin, MULTISIG_ZK, budget);
+  function _deployZk(IPool pool, ICollector collector, address admin, uint256 budget) internal {
+    new ClinicStewardV3{salt: "v1"}(address(pool), address(collector), admin, MULTISIG_ZK, budget);
   }
 }
 
@@ -70,14 +70,12 @@ contract Deploy is Script {
     if (block.chainid == ChainIds.MAINNET) {
       DeploymentLibrary._deploy(
         AaveV3Ethereum.POOL,
-        AaveV3Ethereum.ORACLE,
         AaveV3Ethereum.COLLECTOR,
         GovernanceV3Ethereum.EXECUTOR_LVL_1,
         30_000e8
       );
       DeploymentLibrary._deploy(
         AaveV3EthereumLido.POOL,
-        AaveV3Ethereum.ORACLE,
         AaveV3Ethereum.COLLECTOR,
         GovernanceV3Ethereum.EXECUTOR_LVL_1,
         5_000e8
@@ -86,13 +84,12 @@ contract Deploy is Script {
     }
     if (block.chainid == ChainIds.POLYGON) {
       DeploymentLibrary._deploy(
-        AaveV3Polygon.POOL, AaveV3Polygon.ORACLE, AaveV3Polygon.COLLECTOR, GovernanceV3Polygon.EXECUTOR_LVL_1, 30_000e8
+        AaveV3Polygon.POOL, AaveV3Polygon.COLLECTOR, GovernanceV3Polygon.EXECUTOR_LVL_1, 30_000e8
       );
     }
     if (block.chainid == ChainIds.AVALANCHE) {
       DeploymentLibrary._deploy(
         AaveV3Avalanche.POOL,
-        AaveV3Avalanche.ORACLE,
         AaveV3Avalanche.COLLECTOR,
         GovernanceV3Avalanche.EXECUTOR_LVL_1,
         350_000e8
@@ -101,7 +98,6 @@ contract Deploy is Script {
     if (block.chainid == ChainIds.OPTIMISM) {
       DeploymentLibrary._deploy(
         AaveV3Optimism.POOL,
-        AaveV3Optimism.ORACLE,
         AaveV3Optimism.COLLECTOR,
         GovernanceV3Optimism.EXECUTOR_LVL_1,
         5_000e8
@@ -110,7 +106,6 @@ contract Deploy is Script {
     if (block.chainid == ChainIds.ARBITRUM) {
       DeploymentLibrary._deploy(
         AaveV3Arbitrum.POOL,
-        AaveV3Arbitrum.ORACLE,
         AaveV3Arbitrum.COLLECTOR,
         GovernanceV3Arbitrum.EXECUTOR_LVL_1,
         60_000e8
@@ -118,37 +113,37 @@ contract Deploy is Script {
     }
     if (block.chainid == ChainIds.SCROLL) {
       DeploymentLibrary._deploy(
-        AaveV3Scroll.POOL, AaveV3Scroll.ORACLE, AaveV3Scroll.COLLECTOR, GovernanceV3Scroll.EXECUTOR_LVL_1, 1_000e8
+        AaveV3Scroll.POOL, AaveV3Scroll.COLLECTOR, GovernanceV3Scroll.EXECUTOR_LVL_1, 1_000e8
       );
     }
     if (block.chainid == ChainIds.BASE) {
       DeploymentLibrary._deploy(
-        AaveV3Base.POOL, AaveV3Base.ORACLE, AaveV3Base.COLLECTOR, GovernanceV3Base.EXECUTOR_LVL_1, 15_000e8
+        AaveV3Base.POOL, AaveV3Base.COLLECTOR, GovernanceV3Base.EXECUTOR_LVL_1, 15_000e8
       );
     }
     if (block.chainid == ChainIds.ZKSYNC) {
       DeploymentLibrary._deployZk(
-        AaveV3ZkSync.POOL, AaveV3ZkSync.ORACLE, AaveV3ZkSync.COLLECTOR, GovernanceV3ZkSync.EXECUTOR_LVL_1, 1_000e8
+        AaveV3ZkSync.POOL, AaveV3ZkSync.COLLECTOR, GovernanceV3ZkSync.EXECUTOR_LVL_1, 1_000e8
       );
     }
     if (block.chainid == ChainIds.BNB) {
       DeploymentLibrary._deploy(
-        AaveV3BNB.POOL, AaveV3BNB.ORACLE, AaveV3BNB.COLLECTOR, GovernanceV3BNB.EXECUTOR_LVL_1, 2_000e8
+        AaveV3BNB.POOL, AaveV3BNB.COLLECTOR, GovernanceV3BNB.EXECUTOR_LVL_1, 2_000e8
       );
     }
     if (block.chainid == ChainIds.GNOSIS) {
       DeploymentLibrary._deploy(
-        AaveV3Gnosis.POOL, AaveV3Gnosis.ORACLE, AaveV3Gnosis.COLLECTOR, GovernanceV3Gnosis.EXECUTOR_LVL_1, 1_000e8
+        AaveV3Gnosis.POOL, AaveV3Gnosis.COLLECTOR, GovernanceV3Gnosis.EXECUTOR_LVL_1, 1_000e8
       );
     }
     if (block.chainid == ChainIds.METIS) {
       DeploymentLibrary._deploy(
-        AaveV3Metis.POOL, AaveV3Metis.ORACLE, AaveV3Metis.COLLECTOR, GovernanceV3Metis.EXECUTOR_LVL_1, 1_000e8
+        AaveV3Metis.POOL, AaveV3Metis.COLLECTOR, GovernanceV3Metis.EXECUTOR_LVL_1, 1_000e8
       );
     }
     if (block.chainid == ChainIds.LINEA) {
       DeploymentLibrary._deploy(
-        AaveV3Linea.POOL, AaveV3Linea.ORACLE, AaveV3Linea.COLLECTOR, GovernanceV3Linea.EXECUTOR_LVL_1, 1_000e8
+        AaveV3Linea.POOL, AaveV3Linea.COLLECTOR, GovernanceV3Linea.EXECUTOR_LVL_1, 1_000e8
       );
     }
   }

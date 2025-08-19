@@ -67,7 +67,7 @@ contract ClinicStewardV2BaseTest is Test {
     vm.createSelectFork(vm.rpcUrl("mainnet"), 23138376);
 
     steward =
-      new ClinicStewardV2(address(AaveV2Ethereum.POOL), address(oracle), collector, admin, guardian, availableBudget);
+      new ClinicStewardV2(address(AaveV2Ethereum.POOL), collector, admin, guardian, availableBudget);
 
     vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
@@ -224,7 +224,7 @@ contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicStewardV2(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
+    steward = new ClinicStewardV2(address(pool), collector, admin, guardian, newAvailableBudget);
 
     vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
@@ -321,7 +321,7 @@ contract ClinicStewardV2Test is ClinicStewardV2BaseTest {
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicStewardV2(address(pool), address(oracle), collector, admin, guardian, newAvailableBudget);
+    steward = new ClinicStewardV2(address(pool), collector, admin, guardian, newAvailableBudget);
 
     vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));

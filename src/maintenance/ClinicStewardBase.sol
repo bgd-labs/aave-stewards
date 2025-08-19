@@ -77,29 +77,24 @@ abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall,
   address public immutable override COLLECTOR;
 
   /// @inheritdoc IClinicSteward
-  address public immutable override ORACLE;
-
-  /// @inheritdoc IClinicSteward
   uint256 public override availableBudget;
 
   /* CONSTRUCTOR */
 
   /// @param pool The address of the Aave Pool.
-  /// @param oracle The address of the Aave Oracle.
   /// @param collector The address of the Aave collector.
   /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
   /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
   /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
   constructor(
     address pool,
-    address oracle,
     address collector,
     address admin,
     address cleanupRoleRecipient,
     uint256 initialBudget
   ) {
     if (
-      pool == address(0) || oracle == address(0) || collector == address(0) || admin == address(0)
+      pool == address(0) || collector == address(0) || admin == address(0)
         || cleanupRoleRecipient == address(0)
     ) {
       revert ZeroAddress();
@@ -107,7 +102,6 @@ abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall,
 
     POOL = IPool(pool);
     COLLECTOR = collector;
-    ORACLE = oracle;
 
     _setAvailableBudget(initialBudget);
 
