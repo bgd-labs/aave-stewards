@@ -20,9 +20,9 @@ contract OracleMock {
   int256 internal _price;
   uint256 internal _decimals;
 
-  constructor(int256 price, uint256 decimals) {
+  constructor(int256 price, uint256 decimals_) {
     _price = price;
-    _decimals = decimals;
+    _decimals = decimals_;
   }
 
   function latestAnswer() external view returns (int256) {

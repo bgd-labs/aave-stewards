@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ClinicSteward} from "src/maintenance/ClinicSteward.sol";
+import {ClinicStewardV3} from "src/maintenance/ClinicStewardV3.sol";
 import {IPool} from "aave-v3-origin/contracts/interfaces/IPool.sol";
+import {IAaveOracle} from "aave-v3-origin/contracts/interfaces/IAaveOracle.sol";
 import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
 import {Script, Create2Utils} from "solidity-utils/contracts/utils/ScriptUtils.sol";
 import {ChainIds} from "solidity-utils/contracts/utils/ChainHelpers.sol";
@@ -52,12 +53,12 @@ address constant MULTISIG_ZK = 0x77CC0A0582475bfD74CD838610e817d05c181E11;
 library DeploymentLibrary {
   function _deploy(IPool pool, ICollector collector, address admin, uint256 budget) internal {
     Create2Utils.create2Deploy(
-      "v1", type(ClinicSteward).creationCode, abi.encode(address(pool), address(collector), admin, MULTISIG, budget)
+      "v1", type(ClinicStewardV3).creationCode, abi.encode(address(pool), address(collector), admin, MULTISIG, budget)
     );
   }
 
   function _deployZk(IPool pool, ICollector collector, address admin, uint256 budget) internal {
-    new ClinicSteward{salt: "v1"}(address(pool), address(collector), admin, MULTISIG_ZK, budget);
+    new ClinicStewardV3{salt: "v1"}(address(pool), address(collector), admin, MULTISIG_ZK, budget);
   }
 }
 
