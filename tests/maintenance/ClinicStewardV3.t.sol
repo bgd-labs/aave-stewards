@@ -64,9 +64,7 @@ contract ClinicStewardV3BaseTest is Test {
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("avalanche"), 57114758); // https://snowscan.xyz/block/56768474
-    steward = new ClinicStewardV3(
-      address(AaveV3Avalanche.POOL), collector, admin, guardian, availableBudget
-    );
+    steward = new ClinicStewardV3(address(AaveV3Avalanche.POOL), collector, admin, guardian, availableBudget);
 
     // v3.3 pool upgrade
     GovV3Helpers.executePayload(vm, 67);
@@ -178,9 +176,7 @@ contract ClinicStewardV3Test is ClinicStewardV3BaseTest {
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicStewardV3(
-      address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget
-    );
+    steward = new ClinicStewardV3(address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget);
 
     vm.prank(AaveV3Avalanche.ACL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));
@@ -302,9 +298,7 @@ contract ClinicStewardV3Test is ClinicStewardV3BaseTest {
 
     uint256 newAvailableBudget = debtDollarAmount / 2;
 
-    steward = new ClinicStewardV3(
-      address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget
-    );
+    steward = new ClinicStewardV3(address(AaveV3Avalanche.POOL), collector, admin, guardian, newAvailableBudget);
 
     vm.prank(AaveV3Avalanche.ACL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));

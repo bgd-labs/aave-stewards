@@ -86,17 +86,8 @@ abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall,
   /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
   /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
   /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
-  constructor(
-    address pool,
-    address collector,
-    address admin,
-    address cleanupRoleRecipient,
-    uint256 initialBudget
-  ) {
-    if (
-      pool == address(0) || collector == address(0) || admin == address(0)
-        || cleanupRoleRecipient == address(0)
-    ) {
+  constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 initialBudget) {
+    if (pool == address(0) || collector == address(0) || admin == address(0) || cleanupRoleRecipient == address(0)) {
       revert ZeroAddress();
     }
 

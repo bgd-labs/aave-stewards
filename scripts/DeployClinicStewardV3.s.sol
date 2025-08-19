@@ -53,9 +53,7 @@ address constant MULTISIG_ZK = 0x77CC0A0582475bfD74CD838610e817d05c181E11;
 library DeploymentLibrary {
   function _deploy(IPool pool, ICollector collector, address admin, uint256 budget) internal {
     Create2Utils.create2Deploy(
-      "v1",
-      type(ClinicStewardV3).creationCode,
-      abi.encode(address(pool), address(collector), admin, MULTISIG, budget)
+      "v1", type(ClinicStewardV3).creationCode, abi.encode(address(pool), address(collector), admin, MULTISIG, budget)
     );
   }
 
@@ -69,16 +67,10 @@ contract Deploy is Script {
     vm.startBroadcast();
     if (block.chainid == ChainIds.MAINNET) {
       DeploymentLibrary._deploy(
-        AaveV3Ethereum.POOL,
-        AaveV3Ethereum.COLLECTOR,
-        GovernanceV3Ethereum.EXECUTOR_LVL_1,
-        30_000e8
+        AaveV3Ethereum.POOL, AaveV3Ethereum.COLLECTOR, GovernanceV3Ethereum.EXECUTOR_LVL_1, 30_000e8
       );
       DeploymentLibrary._deploy(
-        AaveV3EthereumLido.POOL,
-        AaveV3Ethereum.COLLECTOR,
-        GovernanceV3Ethereum.EXECUTOR_LVL_1,
-        5_000e8
+        AaveV3EthereumLido.POOL, AaveV3Ethereum.COLLECTOR, GovernanceV3Ethereum.EXECUTOR_LVL_1, 5_000e8
       );
       // _deploy(AaveV3EthereumEtherFi.POOL, AaveV3Ethereum.COLLECTOR, GovernanceV3Mainnet.EXECUTOR_LVL_1);
     }
@@ -89,62 +81,39 @@ contract Deploy is Script {
     }
     if (block.chainid == ChainIds.AVALANCHE) {
       DeploymentLibrary._deploy(
-        AaveV3Avalanche.POOL,
-        AaveV3Avalanche.COLLECTOR,
-        GovernanceV3Avalanche.EXECUTOR_LVL_1,
-        350_000e8
+        AaveV3Avalanche.POOL, AaveV3Avalanche.COLLECTOR, GovernanceV3Avalanche.EXECUTOR_LVL_1, 350_000e8
       );
     }
     if (block.chainid == ChainIds.OPTIMISM) {
       DeploymentLibrary._deploy(
-        AaveV3Optimism.POOL,
-        AaveV3Optimism.COLLECTOR,
-        GovernanceV3Optimism.EXECUTOR_LVL_1,
-        5_000e8
+        AaveV3Optimism.POOL, AaveV3Optimism.COLLECTOR, GovernanceV3Optimism.EXECUTOR_LVL_1, 5_000e8
       );
     }
     if (block.chainid == ChainIds.ARBITRUM) {
       DeploymentLibrary._deploy(
-        AaveV3Arbitrum.POOL,
-        AaveV3Arbitrum.COLLECTOR,
-        GovernanceV3Arbitrum.EXECUTOR_LVL_1,
-        60_000e8
+        AaveV3Arbitrum.POOL, AaveV3Arbitrum.COLLECTOR, GovernanceV3Arbitrum.EXECUTOR_LVL_1, 60_000e8
       );
     }
     if (block.chainid == ChainIds.SCROLL) {
-      DeploymentLibrary._deploy(
-        AaveV3Scroll.POOL, AaveV3Scroll.COLLECTOR, GovernanceV3Scroll.EXECUTOR_LVL_1, 1_000e8
-      );
+      DeploymentLibrary._deploy(AaveV3Scroll.POOL, AaveV3Scroll.COLLECTOR, GovernanceV3Scroll.EXECUTOR_LVL_1, 1_000e8);
     }
     if (block.chainid == ChainIds.BASE) {
-      DeploymentLibrary._deploy(
-        AaveV3Base.POOL, AaveV3Base.COLLECTOR, GovernanceV3Base.EXECUTOR_LVL_1, 15_000e8
-      );
+      DeploymentLibrary._deploy(AaveV3Base.POOL, AaveV3Base.COLLECTOR, GovernanceV3Base.EXECUTOR_LVL_1, 15_000e8);
     }
     if (block.chainid == ChainIds.ZKSYNC) {
-      DeploymentLibrary._deployZk(
-        AaveV3ZkSync.POOL, AaveV3ZkSync.COLLECTOR, GovernanceV3ZkSync.EXECUTOR_LVL_1, 1_000e8
-      );
+      DeploymentLibrary._deployZk(AaveV3ZkSync.POOL, AaveV3ZkSync.COLLECTOR, GovernanceV3ZkSync.EXECUTOR_LVL_1, 1_000e8);
     }
     if (block.chainid == ChainIds.BNB) {
-      DeploymentLibrary._deploy(
-        AaveV3BNB.POOL, AaveV3BNB.COLLECTOR, GovernanceV3BNB.EXECUTOR_LVL_1, 2_000e8
-      );
+      DeploymentLibrary._deploy(AaveV3BNB.POOL, AaveV3BNB.COLLECTOR, GovernanceV3BNB.EXECUTOR_LVL_1, 2_000e8);
     }
     if (block.chainid == ChainIds.GNOSIS) {
-      DeploymentLibrary._deploy(
-        AaveV3Gnosis.POOL, AaveV3Gnosis.COLLECTOR, GovernanceV3Gnosis.EXECUTOR_LVL_1, 1_000e8
-      );
+      DeploymentLibrary._deploy(AaveV3Gnosis.POOL, AaveV3Gnosis.COLLECTOR, GovernanceV3Gnosis.EXECUTOR_LVL_1, 1_000e8);
     }
     if (block.chainid == ChainIds.METIS) {
-      DeploymentLibrary._deploy(
-        AaveV3Metis.POOL, AaveV3Metis.COLLECTOR, GovernanceV3Metis.EXECUTOR_LVL_1, 1_000e8
-      );
+      DeploymentLibrary._deploy(AaveV3Metis.POOL, AaveV3Metis.COLLECTOR, GovernanceV3Metis.EXECUTOR_LVL_1, 1_000e8);
     }
     if (block.chainid == ChainIds.LINEA) {
-      DeploymentLibrary._deploy(
-        AaveV3Linea.POOL, AaveV3Linea.COLLECTOR, GovernanceV3Linea.EXECUTOR_LVL_1, 1_000e8
-      );
+      DeploymentLibrary._deploy(AaveV3Linea.POOL, AaveV3Linea.COLLECTOR, GovernanceV3Linea.EXECUTOR_LVL_1, 1_000e8);
     }
   }
 }

@@ -11,13 +11,9 @@ contract ClinicStewardV3 is ClinicStewardBase {
   /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
   /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
   /// @param initialBudget The initial available budget, in dollar value (with 8 decimals).
-  constructor(
-    address pool,
-    address collector,
-    address admin,
-    address cleanupRoleRecipient,
-    uint256 initialBudget
-  ) ClinicStewardBase(pool, collector, admin, cleanupRoleRecipient, initialBudget) {}
+  constructor(address pool, address collector, address admin, address cleanupRoleRecipient, uint256 initialBudget)
+    ClinicStewardBase(pool, collector, admin, cleanupRoleRecipient, initialBudget)
+  {}
 
   function _getReserveAToken(address asset) internal view override returns (address) {
     return POOL.getReserveAToken(asset);

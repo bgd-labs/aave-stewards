@@ -66,8 +66,7 @@ contract ClinicStewardV2BaseTest is Test {
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl("mainnet"), 23138376);
 
-    steward =
-      new ClinicStewardV2(address(AaveV2Ethereum.POOL), collector, admin, guardian, availableBudget);
+    steward = new ClinicStewardV2(address(AaveV2Ethereum.POOL), collector, admin, guardian, availableBudget);
 
     vm.prank(AaveV2Ethereum.POOL_ADMIN);
     IAccessControl(address(collector)).grantRole("FUNDS_ADMIN", address(steward));

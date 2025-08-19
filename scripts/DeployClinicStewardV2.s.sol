@@ -22,9 +22,7 @@ address constant MULTISIG = 0xdeadD8aB03075b7FBA81864202a2f59EE25B312b;
 library DeploymentLibrary {
   function _deploy(ILendingPool pool, ICollector collector, address admin, uint256 budget) internal {
     Create2Utils.create2Deploy(
-      "v1",
-      type(ClinicStewardV2).creationCode,
-      abi.encode(address(pool), address(collector), admin, MULTISIG, budget)
+      "v1", type(ClinicStewardV2).creationCode, abi.encode(address(pool), address(collector), admin, MULTISIG, budget)
     );
   }
 }
@@ -34,16 +32,10 @@ contract Deploy is Script {
     vm.startBroadcast();
     if (block.chainid == ChainIds.MAINNET) {
       DeploymentLibrary._deploy(
-        AaveV2Ethereum.POOL,
-        AaveV2Ethereum.COLLECTOR,
-        GovernanceV3Ethereum.EXECUTOR_LVL_1,
-        30_000e8
+        AaveV2Ethereum.POOL, AaveV2Ethereum.COLLECTOR, GovernanceV3Ethereum.EXECUTOR_LVL_1, 30_000e8
       );
       DeploymentLibrary._deploy(
-        AaveV2EthereumAMM.POOL,
-        AaveV2EthereumAMM.COLLECTOR,
-        GovernanceV3Ethereum.EXECUTOR_LVL_1,
-        5_000e8
+        AaveV2EthereumAMM.POOL, AaveV2EthereumAMM.COLLECTOR, GovernanceV3Ethereum.EXECUTOR_LVL_1, 5_000e8
       );
     }
     if (block.chainid == ChainIds.POLYGON) {
@@ -53,10 +45,7 @@ contract Deploy is Script {
     }
     if (block.chainid == ChainIds.AVALANCHE) {
       DeploymentLibrary._deploy(
-        AaveV2Avalanche.POOL,
-        AaveV2Avalanche.COLLECTOR,
-        GovernanceV3Avalanche.EXECUTOR_LVL_1,
-        350_000e8
+        AaveV2Avalanche.POOL, AaveV2Avalanche.COLLECTOR, GovernanceV3Avalanche.EXECUTOR_LVL_1, 350_000e8
       );
     }
   }
