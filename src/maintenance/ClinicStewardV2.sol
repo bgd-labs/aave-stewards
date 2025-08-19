@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {AggregatorInterface} from "aave-v3-origin/contracts/dependencies/chainlink/AggregatorInterface.sol";
+
 import {IPriceOracleGetter} from "aave-address-book/AaveV3.sol";
 import {DataTypes, ILendingPool} from "aave-address-book/AaveV2.sol";
 
@@ -8,8 +10,6 @@ import {ChainlinkEthereum} from "aave-address-book/ChainlinkEthereum.sol";
 import {ChainlinkPolygon} from "aave-address-book/ChainlinkPolygon.sol";
 
 import {ClinicStewardBase} from "./ClinicStewardBase.sol";
-
-import {AggregatorInterface} from "./interfaces/AggregatorInterface.sol";
 
 contract ClinicStewardV2 is ClinicStewardBase {
   /// @param pool The address of the Aave Pool.
