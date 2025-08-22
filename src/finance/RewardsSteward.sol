@@ -2,9 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ICollector, CollectorUtils as CU} from "aave-helpers/src/CollectorUtils.sol";
 import {RescuableBase, IRescuableBase} from "solidity-utils/contracts/utils/RescuableBase.sol";
-import {ChainIds} from "solidity-utils/contracts/utils/ChainHelpers.sol";
 import {IRewardsController} from "aave-v3-origin/contracts/rewards/interfaces/IRewardsController.sol";
 
 import {IRewardsSteward} from "./interfaces/IRewardsSteward.sol";
