@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPool, DataTypes, IPoolAddressesProvider, IPriceOracleGetter} from "aave-address-book/AaveV3.sol";
+import {IPool, DataTypes, IPoolAddressesProvider} from "aave-address-book/AaveV3.sol";
 
 import {UserConfiguration} from "aave-v3-origin/contracts/protocol/libraries/configuration/UserConfiguration.sol";
 import {ICollector} from "aave-v3-origin/contracts/treasury/ICollector.sol";
@@ -22,13 +22,13 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  * @title ClinicSteward
  * @author BGD Labs
  * @notice This contract helps with the liquidation or repayment of bad debt for
- * a list of users within the Aave V3 protocol.
+ * a list of users within the Aave V2 or V3 protocol.
  * All funds for those operations are pulled from the Aave Collector.
  *
  * Repayment of bad debt is permitted only for users without any collateral.
  * If a user has collateral, a liquidation should be performed instead.
  *
- * The contract inherits from `Multicall`. Using the `multicall` function from this contract\
+ * The contract inherits from `Multicall`. Using the `multicall` function from this contract
  * multiple liquidation or repayment operations could be bundled into a single transaction.
  *
  * -- Security Considerations --
@@ -61,7 +61,7 @@ import {IClinicSteward} from "./interfaces/IClinicSteward.sol";
  * The available budget is tracked in $ with 8 decimal precision.
  * When liquidating or repaying assets worth less than 1 unit, it will not be discounted from the budget.
  */
-contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessControl {
+abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall, AccessControl {
   using SafeERC20 for IERC20;
   using UserConfiguration for DataTypes.UserConfigurationMap;
 
@@ -84,7 +84,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
   /* CONSTRUCTOR */
 
-  /// @param pool The address of the Aave pool.
+  /// @param pool The address of the Aave Pool.
   /// @param collector The address of the Aave collector.
   /// @param admin The address of the admin. He will receive the `DEFAULT_ADMIN_ROLE` role.
   /// @param cleanupRoleRecipient The address of the `CLEANUP_ROLE` role recipient.
@@ -96,7 +96,6 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
     POOL = IPool(pool);
     COLLECTOR = collector;
-    ORACLE = IPoolAddressesProvider(IPool(pool).ADDRESSES_PROVIDER()).getPriceOracle();
 
     _setAvailableBudget(initialBudget);
 
@@ -150,7 +149,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
       try POOL.liquidationCall({
         collateralAsset: collateralAsset,
         debtAsset: debtAsset,
-        user: users[i],
+        borrower: users[i],
         debtToCover: type(uint256).max,
         receiveAToken: true
       }) {} catch {
@@ -165,7 +164,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     _transferExcessToCollector(debtAsset);
 
     // transfer back liquidated assets
-    address collateralAToken = POOL.getReserveAToken(collateralAsset);
+    address collateralAToken = _getReserveAToken(collateralAsset);
     _transferExcessToCollector(collateralAToken);
   }
 
@@ -215,7 +214,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
   function _pullFunds(address asset, uint256 amount, bool useAToken) private {
     if (useAToken) {
-      address aToken = POOL.getReserveAToken(asset);
+      address aToken = _getReserveAToken(asset);
       // 1 wei surplus to account for rounding on multiple operations
       ICollector(COLLECTOR).transfer(IERC20(aToken), address(this), amount + 1);
       POOL.withdraw(asset, type(uint256).max, address(this));
@@ -225,7 +224,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
   }
 
   function _decreaseAvailableBudget(address asset, uint256 amount) private {
-    uint256 assetPrice = IPriceOracleGetter(ORACLE).getAssetPrice(asset);
+    uint256 assetPrice = _getOraclePrice(asset);
 
     uint256 dollarAmount = (amount * assetPrice) / (10 ** IERC20Metadata(asset).decimals());
 
@@ -268,7 +267,7 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
     uint256 totalDebtAmount;
     uint256[] memory debtAmounts = new uint256[](users.length);
 
-    address variableDebtTokenAddress = POOL.getReserveVariableDebtToken(asset);
+    address variableDebtTokenAddress = _getReserveVariableDebtToken(asset);
 
     address user;
     for (uint256 i = 0; i < users.length; i++) {
@@ -287,4 +286,10 @@ contract ClinicSteward is IClinicSteward, RescuableBase, Multicall, AccessContro
 
     return (totalDebtAmount, debtAmounts);
   }
+
+  function _getReserveAToken(address asset) internal view virtual returns (address);
+
+  function _getReserveVariableDebtToken(address asset) internal view virtual returns (address);
+
+  function _getOraclePrice(address asset) internal view virtual returns (uint256);
 }
