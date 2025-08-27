@@ -225,6 +225,9 @@ abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall,
 
   function _decreaseAvailableBudget(address asset, uint256 amount) private {
     uint256 assetPrice = _getOraclePrice(asset);
+    if (assetPrice == 0) {
+      revert ZeroOraclePrice();
+    }
 
     uint256 dollarAmount = (amount * assetPrice) / (10 ** IERC20Metadata(asset).decimals());
 

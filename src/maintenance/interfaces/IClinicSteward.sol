@@ -13,6 +13,9 @@ interface IClinicSteward is IRescuableBase, IAccessControl {
   /// @notice Thrown when passed address is zero
   error ZeroAddress();
 
+  /// @notice Thrown when the price of an asset is not available
+  error ZeroOraclePrice();
+
   /// @notice Thrown when an attempt is made to pull more funds (in dollar value) than the available budget allows.
   /// @param asset The asset being pulled.
   /// @param assetAmount The amount of the asset being pulled.
