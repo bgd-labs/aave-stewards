@@ -312,6 +312,18 @@ contract BridgeTest is ArbEthERC20BridgeStewardTest {
         vm.stopPrank();
     }
 
+    function test_revertsIf_zeroAmount() public {
+        vm.startPrank(OWNER);
+        steward.setTokenMapping(
+            AaveV3ArbitrumAssets.USDC_UNDERLYING,
+            AaveV3EthereumAssets.USDC_UNDERLYING,
+            USDC_E_GATEWAY
+        );
+        vm.expectRevert(IArbEthERC20BridgeSteward.InvalidZeroAmount.selector);
+        steward.bridge(AaveV3ArbitrumAssets.USDC_UNDERLYING, 0);
+        vm.stopPrank();
+    }
+
     function test_successful() public {
         uint256 amount = 1_000e6;
         _fundCollectorUSDCe(amount);
@@ -378,6 +390,18 @@ contract BridgeNativeTest is ArbEthERC20BridgeStewardTest {
         vm.stopPrank();
     }
 
+    function test_revertsIf_zeroAmount() public {
+        vm.startPrank(OWNER);
+        steward.setTokenMapping(
+            AaveV3ArbitrumAssets.WETH_UNDERLYING,
+            AaveV3EthereumAssets.WETH_UNDERLYING,
+            WETH_GATEWAY
+        );
+        vm.expectRevert(IArbEthERC20BridgeSteward.InvalidZeroAmount.selector);
+        steward.bridgeNative(0);
+        vm.stopPrank();
+    }
+
     function test_successful() public {
         address weth = AaveV3ArbitrumAssets.WETH_UNDERLYING;
         uint256 amount = 1 ether;
@@ -401,6 +425,9 @@ contract BridgeNativeTest is ArbEthERC20BridgeStewardTest {
         assertEq(IERC20(weth).balanceOf(address(steward)), 0);
         assertEq(address(steward).balance, 0);
         assertEq(steward.nonce(), 1);
+
+        ArbSysMock arbSys = ArbSysMock(steward.ARB_SYS());
+        assertEq(arbSys.lastWithdrawDestination(), address(AaveV3Ethereum.COLLECTOR));
     }
 }
 
@@ -458,6 +485,30 @@ contract RescueTokenTest is ArbEthERC20BridgeStewardTest {
             0
         );
     }
+
+    function test_successful_guardianCaller() public {
+        uint256 rescueAmount = 1_000e18;
+        deal(AaveV3ArbitrumAssets.WETH_UNDERLYING, address(steward), rescueAmount);
+
+        uint256 initialCollectorBalance = IERC20(
+            AaveV3ArbitrumAssets.WETH_UNDERLYING
+        ).balanceOf(address(AaveV3Arbitrum.COLLECTOR));
+
+        vm.startPrank(GUARDIAN);
+        steward.rescueToken(AaveV3ArbitrumAssets.WETH_UNDERLYING);
+        vm.stopPrank();
+
+        assertEq(
+            IERC20(AaveV3ArbitrumAssets.WETH_UNDERLYING).balanceOf(
+                address(AaveV3Arbitrum.COLLECTOR)
+            ),
+            initialCollectorBalance + rescueAmount
+        );
+        assertEq(
+            IERC20(AaveV3ArbitrumAssets.WETH_UNDERLYING).balanceOf(address(steward)),
+            0
+        );
+    }
 }
 
 contract RescueEthTest is ArbEthERC20BridgeStewardTest {
@@ -492,17 +543,22 @@ contract RescueEthTest is ArbEthERC20BridgeStewardTest {
         );
         assertEq(address(steward).balance, 0);
     }
-}
 
-contract ReceiveTest is ArbEthERC20BridgeStewardTest {
-    function test_successful_receivesETH() public {
-        uint256 balanceBefore = address(steward).balance;
-        assertEq(balanceBefore, 0);
+    function test_successful_guardianCaller() public {
+        uint256 amount = 10 ether;
+        deal(address(steward), amount);
 
-        (bool success, ) = address(steward).call{value: 1 ether}("");
-        assertTrue(success);
+        uint256 initialCollectorBalance = address(AaveV3Arbitrum.COLLECTOR).balance;
 
-        assertEq(address(steward).balance, 1 ether);
+        vm.startPrank(GUARDIAN);
+        steward.rescueEth();
+        vm.stopPrank();
+
+        assertEq(
+            address(AaveV3Arbitrum.COLLECTOR).balance,
+            initialCollectorBalance + amount
+        );
+        assertEq(address(steward).balance, 0);
     }
 }
 

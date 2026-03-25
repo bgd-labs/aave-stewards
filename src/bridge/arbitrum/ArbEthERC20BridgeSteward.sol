@@ -39,9 +39,10 @@ import {IArbSys} from "./interfaces/IArbSys.sol";
  * The owner will always be the respective network Level 1 Executor (governance).
  * The guardian role will be given to a Financial Service provider of the DAO (AFC).
  *
- * While the permitted Service Provider will have full control over the funds, the allowed
- * actions are limited by the contract itself. All token interactions start and end on the
- * Collector, so no funds ever leave the DAO's possession at any point in time.
+ * While the permitted Service Provider will have full operational control within the
+ * governance-defined token allowlist, the allowed actions are limited by the contract itself.
+ * All token interactions start and end on the Collector, so no funds ever leave the DAO's
+ * possession at any point in time.
  */
 contract ArbEthERC20BridgeSteward is
     IArbEthERC20BridgeSteward,
@@ -80,7 +81,7 @@ contract ArbEthERC20BridgeSteward is
         COLLECTOR = collector;
     }
 
-    /// @dev Allows the contract to receive ETH
+    /// @dev Required to receive ETH from WETH.withdraw() during bridgeNative
     receive() external payable {}
 
     /// @inheritdoc IArbEthERC20BridgeSteward
@@ -89,6 +90,7 @@ contract ArbEthERC20BridgeSteward is
         uint256 amount
     ) external onlyOwnerOrGuardian {
         if (block.chainid != ChainIds.ARBITRUM) revert InvalidChain();
+        if (amount == 0) revert InvalidZeroAmount();
 
         TokenConfig memory config = tokenConfigs[token];
         if (config.l1Token == address(0)) revert TokenNotAllowed();
@@ -109,10 +111,14 @@ contract ArbEthERC20BridgeSteward is
     /// @inheritdoc IArbEthERC20BridgeSteward
     function bridgeNative(uint256 amount) external onlyOwnerOrGuardian {
         if (block.chainid != ChainIds.ARBITRUM) revert InvalidChain();
+        if (amount == 0) revert InvalidZeroAmount();
         if (
             tokenConfigs[AaveV3ArbitrumAssets.WETH_UNDERLYING].l1Token ==
             address(0)
         ) revert TokenNotAllowed();
+        // Note: the `gateway` field in tokenConfigs[WETH] is not used here.
+        // Native ETH withdrawals on Arbitrum must go through ArbSys.withdrawEth,
+        // not the ERC20 gateway.
 
         ICollector(COLLECTOR).transfer(
             IERC20(AaveV3ArbitrumAssets.WETH_UNDERLYING),

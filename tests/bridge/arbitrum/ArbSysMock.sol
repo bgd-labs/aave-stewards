@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 /// @notice Mocked version of the Arbitrum system contract (precompile at 0x64)
 contract ArbSysMock {
     uint256 ticketId;
+    address public lastWithdrawDestination;
 
     function sendTxToL1(
         address _l1Target,
@@ -15,7 +16,8 @@ contract ArbSysMock {
         return ++ticketId;
     }
 
-    function withdrawEth(address) external payable returns (uint256) {
+    function withdrawEth(address destination) external payable returns (uint256) {
+        lastWithdrawDestination = destination;
         return ++ticketId;
     }
 }

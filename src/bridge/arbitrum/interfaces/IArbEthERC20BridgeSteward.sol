@@ -14,6 +14,9 @@ interface IArbEthERC20BridgeSteward {
     /// @dev Token has not been approved for bridging
     error TokenNotAllowed();
 
+    /// @dev Amount must be greater than zero
+    error InvalidZeroAmount();
+
     struct TokenConfig {
         address l1Token;
         address gateway;

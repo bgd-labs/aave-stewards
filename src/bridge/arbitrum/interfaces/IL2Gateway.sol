@@ -14,5 +14,5 @@ interface IL2Gateway {
         address to,
         uint256 amount,
         bytes calldata data
-    ) external;
+    ) external payable returns (bytes memory);
 }
