@@ -30,9 +30,8 @@ contract RewardsStewardTest is Test {
     steward = new RewardsSteward(address(AaveV3Ethereum.COLLECTOR), AaveV3Ethereum.DEFAULT_INCENTIVES_CONTROLLER);
 
     vm.prank(AaveV3Ethereum.EMISSION_MANAGER);
-    IRewardsController(AaveV3Ethereum.DEFAULT_INCENTIVES_CONTROLLER).setClaimer(
-      address(AaveV3Ethereum.COLLECTOR), address(steward)
-    );
+    IRewardsController(AaveV3Ethereum.DEFAULT_INCENTIVES_CONTROLLER)
+      .setClaimer(address(AaveV3Ethereum.COLLECTOR), address(steward));
   }
 }
 

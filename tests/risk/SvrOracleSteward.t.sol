@@ -9,7 +9,9 @@ import {AaveV3Ethereum, AaveV3EthereumAssets} from "aave-address-book/AaveV3Ethe
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IAccessControl} from "openzeppelin-contracts/contracts/access/IAccessControl.sol";
 import {
-  Ownable, OwnableWithGuardian, IWithGuardian
+  Ownable,
+  OwnableWithGuardian,
+  IWithGuardian
 } from "solidity-utils/contracts/access-control/OwnableWithGuardian.sol";
 import {AggregatorInterface} from "aave-v3-origin/contracts/dependencies/chainlink/AggregatorInterface.sol";
 
@@ -154,8 +156,7 @@ contract SvrOracleStewardBaseTest is Test {
   function test_ifNoGuardian_activateSvrOracle_shouldRevert() external {
     SvrOracleSteward.AssetOracle[] memory configs = new ISvrOracleSteward.AssetOracle[](1);
     configs[0] = ISvrOracleSteward.AssetOracle({
-      asset: AaveV3EthereumAssets.cbBTC_UNDERLYING,
-      svrOracle: 0x77E55306eeDb1F94a4DcFbAa6628ef87586BC651
+      asset: AaveV3EthereumAssets.cbBTC_UNDERLYING, svrOracle: 0x77E55306eeDb1F94a4DcFbAa6628ef87586BC651
     });
     vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(this)));
     steward.enableSvrOracles(configs);

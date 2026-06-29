@@ -152,7 +152,8 @@ abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall,
         borrower: users[i],
         debtToCover: type(uint256).max,
         receiveAToken: true
-      }) {} catch {
+      }) {}
+      catch {
         maxDebtAmount -= amounts[i];
       }
     }
@@ -235,10 +236,7 @@ abstract contract ClinicStewardBase is IClinicSteward, RescuableBase, Multicall,
 
     if (dollarAmount > oldAvailableBudget) {
       revert AvailableBudgetExceeded({
-        asset: asset,
-        assetAmount: amount,
-        dollarAmount: dollarAmount,
-        availableBudget: oldAvailableBudget
+        asset: asset, assetAmount: amount, dollarAmount: dollarAmount, availableBudget: oldAvailableBudget
       });
     }
 

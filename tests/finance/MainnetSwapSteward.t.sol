@@ -792,9 +792,8 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
 
     // Creating this order yields the following order hash:
     // 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    bool orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
-      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    );
+    bool orderExists = IComposableCow(COMPOSABLE_COW)
+      .singleOrders(address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28);
 
     assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - (amount * numParts));
     assertTrue(orderExists, "Order does not exist");
@@ -812,9 +811,8 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
       0
     );
 
-    orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
-      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    );
+    orderExists = IComposableCow(COMPOSABLE_COW)
+      .singleOrders(address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28);
     assertTrue(orderExists, "Order incorrectly removed");
     vm.stopPrank();
   }
@@ -846,9 +844,8 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
 
     // Creating this order yields the following order hash:
     // 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    bool orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
-      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    );
+    bool orderExists = IComposableCow(COMPOSABLE_COW)
+      .singleOrders(address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28);
 
     assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - (amount * numParts));
     assertTrue(orderExists, "Order does not exist");
@@ -868,9 +865,8 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
       0
     );
 
-    orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
-      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    );
+    orderExists = IComposableCow(COMPOSABLE_COW)
+      .singleOrders(address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28);
 
     // Budget does not increase
     assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - (amount * numParts));
@@ -905,9 +901,8 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
 
     // Creating this order yields the following order hash:
     // 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    bool orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
-      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    );
+    bool orderExists = IComposableCow(COMPOSABLE_COW)
+      .singleOrders(address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28);
 
     assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - (amount * numParts));
     assertTrue(orderExists, "Order does not exist");
@@ -934,9 +929,8 @@ contract CancelTWAPSwapTest is MainnetSwapStewardTest {
       1
     );
 
-    orderExists = IComposableCow(COMPOSABLE_COW).singleOrders(
-      address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28
-    );
+    orderExists = IComposableCow(COMPOSABLE_COW)
+      .singleOrders(address(steward), 0xa1cd0126c63d96b3d82ba666eb592348a132bfa3dbf6028168fb72df14a3fe28);
 
     // Budget does not increase
     assertEq(steward.tokenBudget(AaveV3EthereumAssets.USDC_UNDERLYING), budgetBefore - (amount * numParts));

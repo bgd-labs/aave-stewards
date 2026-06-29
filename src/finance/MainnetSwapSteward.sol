@@ -231,8 +231,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
       appData: bytes32(0)
     });
 
-    if (
-      !COMPOSABLE_COW.singleOrders(
+    if (!COMPOSABLE_COW.singleOrders(
         address(this),
         keccak256(
           abi.encode(
@@ -241,8 +240,7 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
             )
           )
         )
-      )
-    ) revert OrderDoesNotExist();
+      )) revert OrderDoesNotExist();
 
     COMPOSABLE_COW.remove(
       keccak256(
@@ -370,9 +368,10 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
 
     IERC20(fromToken).safeIncreaseAllowance(milkman, amount);
 
-    IMilkman(milkman).requestSwapExactTokensForTokens(
-      amount, IERC20(fromToken), IERC20(toToken), recipient, bytes32(0), _priceChecker, priceCheckerData
-    );
+    IMilkman(milkman)
+      .requestSwapExactTokensForTokens(
+        amount, IERC20(fromToken), IERC20(toToken), recipient, bytes32(0), _priceChecker, priceCheckerData
+      );
   }
 
   /// @notice Internal function that handles swap cancellations
@@ -392,9 +391,8 @@ contract MainnetSwapSteward is IMainnetSwapSteward, OwnableWithGuardian, Multica
   ) internal {
     uint256 balanceBefore = IERC20(fromToken).balanceOf(address(this));
 
-    IMilkman(tradeMilkman).cancelSwap(
-      amount, IERC20(fromToken), IERC20(toToken), COLLECTOR, bytes32(0), _priceChecker, priceCheckerData
-    );
+    IMilkman(tradeMilkman)
+      .cancelSwap(amount, IERC20(fromToken), IERC20(toToken), COLLECTOR, bytes32(0), _priceChecker, priceCheckerData);
 
     uint256 balanceDiff = IERC20(fromToken).balanceOf(address(this)) - balanceBefore;
 
